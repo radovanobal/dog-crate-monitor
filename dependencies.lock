@@ -1,0 +1,32 @@
+dependencies:
+  espressif/esp_codec_dev:
+    component_hash: 420a8a931f8bdfc74ae89c4d2ce634823d10e1865b1e9bdb8428bfe4a1060def
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.3.6
+  idf:
+    source:
+      type: idf
+    version: 5.5.3
+  waveshare/qmi8658:
+    component_hash: 0f849356dfdcd3c868ad37a74a2cbb00892c69b3b1b18854172715f6eb980e5b
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3.2'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.1
+direct_dependencies:
+- espressif/esp_codec_dev
+- idf
+- waveshare/qmi8658
+manifest_hash: ba272790d925bf18a8a542f4965f2908959e162535fe50af199c884ffb02dde9
+target: esp32s3
+version: 2.0.0

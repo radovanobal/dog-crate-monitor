@@ -35,6 +35,15 @@
 - Follow the DRY (Don't Repeat Yourself) principle, and avoid code duplication. But keep context in mind, code duplication when context is different is not a problem, and can even be a good thing, as it can make the code more readable and easier to understand and maintain.
 - Testing harnesses should be written before the feature implementation starts, and should be used to test the feature as it is being developed. This will help ensure that the feature is implemented correctly and that it works as expected.
 
+### Architecture
+
+- The project should be designed in a way that allows for easy expansion and addition of new features in the future, such as adding support for more sensors, or adding support for more Home Assistant information.
+- The project should use dependency injection to manage dependencies between components, and to allow for easy testing and maintenance.
+- The project should use an event-driven architecture, where components communicate with each other through events and callbacks, rather than direct method calls. This will allow for better decoupling and flexibility in the design of the project.
+- The project should use a modular design, where different components of the project are organized into separate modules or libraries, with clear interfaces and responsibilities. This will allow for better organization and maintainability of the code, and will also allow for easier testing and debugging of individual components.
+- The project should use a layered architecture, where different layers of the project are organized based on their level of abstraction and responsibility. For example, the project could have a hardware abstraction layer (HAL) that handles all interactions with the hardware, a business logic layer that implements the core functionality of the project, and a presentation layer that handles the display and user interface. This will allow for better separation of concerns and modularity in the design of the project, and will also allow for easier testing and maintenance of the code, as changes to one layer will not affect the other layers as much.
+- The device has 2 cores, one core should always be dedicated to handling the display and user interface, while the other core should be dedicated to handling the business logic and hardware interactions. This will allow for better performance and responsivness of the device, as the display and user interface will not be blocked by long-running operations in the business logic or hardware interactions, and vice versa.
+
 ### Version control
 
 - DO NOT commit code. Ever.
