@@ -1,7 +1,9 @@
+#include "esp_log.h"
 #include "epaper_port.h"
 #include "epaper_bsp.h"
 
 #include "./display_types.h"
+#include "./display.h"
 
 
 // Define the grid dimensions
@@ -31,7 +33,7 @@ static struct PixelCoordinates2D pixelRegionTopCenter(struct PixelRegion pixelRe
 static struct PixelCoordinates2D pixelRegionTopRight(struct PixelRegion pixelRegion, struct PixelSize2D itemSize);
 static struct PixelRegion regionToPixelSpace(struct GridRegion gridRegion);
 
-esp_err_t initDisplay(void)
+enum display_error initDisplay(void)
 {
     ESP_LOGI(TAG,"1.e-Paper Init and Clear...");
     epaper_port_init();
@@ -42,13 +44,13 @@ esp_err_t initDisplay(void)
     if((Image_Mono = (UBYTE *)malloc(EPD_SIZE_MONO)) == NULL)
     {
         ESP_LOGE(TAG,"Failed to apply for black memory...");
-        return ESP_ERR_NO_MEM;
+        return DISPLAY_FAIL;
     }
 
     initRenderGrid();
     initRenderRegions();
 
-    return ESP_OK;
+    return DISPLAY_SUCCESS;
 }
 
 void renderToDisplay(float stateTemperatureC, float stateRelativeHumidity, const char *clockText)

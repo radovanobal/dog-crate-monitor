@@ -1,4 +1,7 @@
-#include "epaper_port.h"
+#ifndef DOG_CRATE_MONITOR_DISPLAY_TYPES_H
+#define DOG_CRATE_MONITOR_DISPLAY_TYPES_H
+
+#include <stdint.h>
 
 struct GridConfig {
     int width;
@@ -27,6 +30,8 @@ struct PixelSize2D {
 };
 
 struct PixelCoordinates2D {
-    UWORD x;
-    UWORD y;
+    uint16_t x;
+    uint16_t y;
 };
+
+#endif // DOG_CRATE_MONITOR_DISPLAY_TYPES_H
