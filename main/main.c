@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "i2c_bsp.h"
 #include "shtc3_bsp.h"
+#include "pcf85063_bsp.h"
 
 struct GridConfig {
     int width;
@@ -41,6 +42,7 @@ struct PixelCoordinates2D {
 
 static void initDisplay(void);
 static void initI2C(void);
+static void initRTC(void);
 static void initRenderGrid(void);
 static void initRenderRegions(void);
 static void readTemperatureAndHumidity(void);
@@ -79,6 +81,7 @@ void app_main(void)
     initDisplay();
     initRenderGrid();
     initRenderRegions();
+    initRTC();
 
     while(true) {
         readTemperatureAndHumidity();
@@ -107,6 +110,11 @@ static void initI2C(void)
 {
     i2c_master_init();
     i2c_shtc3_init();
+}
+
+static void initRTC(void)
+{
+    PCF85063_init();
 }
 
 static void initRenderGrid(void)
@@ -158,15 +166,30 @@ static struct PixelCoordinates2D pixelRegionTopCenter(struct PixelRegion pixelRe
     return (struct PixelCoordinates2D){ .x = x, .y = y };
 }
 
+static struct PixelCoordinates2D pixelRegionTopRigth(struct PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
+    const UWORD x = pixelRegion.x + pixelRegion.width - pixelItemSize.width;
+    const UWORD y = pixelRegion.y;
+
+    return (struct PixelCoordinates2D){ .x = x, .y = y };
+}
+
 static void renderToDisplay(void)
 {
     ESP_LOGI(TAG,"3.e-Paper Draw 0...");
 
     char temperatureText[16] = "";
     char humidityText[16] = "";
+    char clockText[16] = "";
 
+    const Time_data currentTime = PCF85063_GetTime();
+
+    snprintf(clockText, sizeof(clockText), "%02d:%02d", currentTime.hours, currentTime.minutes);
     snprintf(temperatureText, sizeof(temperatureText), "%.1f°C", stateTemparatureC);
     snprintf(humidityText, sizeof(humidityText), "%.1f%%", stateRelativeHumidity);
+
+    const struct PixelRegion clockPixelRegion = regionToPixelSpace(clockRegion);
+    const struct PixelSize2D clockTextBoxSize = (struct PixelSize2D){ .width = strlen(clockText) * Font18.Width, .height = Font18.Height };
+    const struct PixelCoordinates2D clockPixelCoordinates = pixelRegionTopRigth(clockPixelRegion, clockTextBoxSize);
 
     const struct PixelRegion temperaturePixelRegion = regionToPixelSpace(temperatureRegion);
     const struct PixelSize2D temperatureTextBoxSize = (struct PixelSize2D){ .width = strlen(temperatureText) * Font48.Width, .height = Font48.Height };
@@ -179,6 +202,7 @@ static void renderToDisplay(void)
     Paint_NewImage(Image_Mono, EPD_WIDTH, EPD_HEIGHT, ROTATE_0, WHITE);
     Paint_SelectImage(Image_Mono);
     Paint_Clear(WHITE);
+    Paint_DrawString_EN(clockPixelCoordinates.x, clockPixelCoordinates.y, clockText, &Font18, WHITE, BLACK);
     Paint_DrawString_EN(temperaturePixelCoordinates.x, temperaturePixelCoordinates.y, temperatureText, &Font48, WHITE, BLACK);
     Paint_DrawString_EN(humidityPixelCoordinates.x, humidityPixelCoordinates.y, humidityText, &Font16, WHITE, BLACK);
 
