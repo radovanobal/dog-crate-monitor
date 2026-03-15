@@ -2,6 +2,7 @@
 #include "epaper_port.h"
 #include "epaper_bsp.h"
 
+#include "./environment_types.h"
 #include "./display_types.h"
 #include "./display.h"
 
@@ -33,6 +34,8 @@ static struct PixelCoordinates2D pixelRegionTopCenter(struct PixelRegion pixelRe
 static struct PixelCoordinates2D pixelRegionTopRight(struct PixelRegion pixelRegion, struct PixelSize2D itemSize);
 static struct PixelRegion regionToPixelSpace(struct GridRegion gridRegion);
 
+static DisplayState currentDisplayState = {0};
+
 enum display_error initDisplay(void)
 {
     ESP_LOGI(TAG,"1.e-Paper Init and Clear...");
@@ -53,36 +56,44 @@ enum display_error initDisplay(void)
     return DISPLAY_SUCCESS;
 }
 
-void renderToDisplay(float stateTemperatureC, float stateRelativeHumidity, const char *clockText)
+static bool isDisplayStateChanged(const DisplayState *left, const DisplayState *right) {
+    return strcmp(left->temperatureText, right->temperatureText) != 0 
+        || strcmp(left->humidityText, right->humidityText) != 0 
+        || strcmp(left->clockText, right->clockText) != 0
+        ;
+}
+
+void renderToDisplay(DisplayState *displayState)
 {
     ESP_LOGI(TAG,"3.e-Paper Draw 0...");
 
-    char temperatureText[16] = "";
-    char humidityText[16] = "";
-
-    snprintf(temperatureText, sizeof(temperatureText), "%.1fC", stateTemperatureC);
-    snprintf(humidityText, sizeof(humidityText), "%.1f%%", stateRelativeHumidity);
+    if (!isDisplayStateChanged(&currentDisplayState, displayState)) {
+        ESP_LOGI(TAG,"Display state has not changed, skipping render.");
+        return;
+    }
 
     const struct PixelRegion clockPixelRegion = regionToPixelSpace(clockRegion);
-    const struct PixelSize2D clockTextBoxSize = (struct PixelSize2D){ .width = strlen(clockText) * Font18.Width, .height = Font18.Height };
+    const struct PixelSize2D clockTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->clockText) * Font18.Width, .height = Font18.Height };
     const struct PixelCoordinates2D clockPixelCoordinates = pixelRegionTopRight(clockPixelRegion, clockTextBoxSize);
 
     const struct PixelRegion temperaturePixelRegion = regionToPixelSpace(temperatureRegion);
-    const struct PixelSize2D temperatureTextBoxSize = (struct PixelSize2D){ .width = strlen(temperatureText) * Font48.Width, .height = Font48.Height };
+    const struct PixelSize2D temperatureTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->temperatureText) * Font48.Width, .height = Font48.Height };
     const struct PixelCoordinates2D temperaturePixelCoordinates = pixelRegionCenter(temperaturePixelRegion, temperatureTextBoxSize);
 
     const struct PixelRegion humidityPixelRegion = regionToPixelSpace(humidityRegion);
-    const struct PixelSize2D humidityTextBoxSize = (struct PixelSize2D){ .width = strlen(humidityText) * Font16.Width, .height = Font16.Height };
+    const struct PixelSize2D humidityTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->humidityText) * Font16.Width, .height = Font16.Height };
     const struct PixelCoordinates2D humidityPixelCoordinates = pixelRegionTopCenter(humidityPixelRegion, humidityTextBoxSize);
 
     Paint_NewImage(Image_Mono, EPD_WIDTH, EPD_HEIGHT, ROTATE_0, WHITE);
     Paint_SelectImage(Image_Mono);
     Paint_Clear(WHITE);
-    Paint_DrawString_EN(clockPixelCoordinates.x, clockPixelCoordinates.y, clockText, &Font18, WHITE, BLACK);
-    Paint_DrawString_EN(temperaturePixelCoordinates.x, temperaturePixelCoordinates.y, temperatureText, &Font48, WHITE, BLACK);
-    Paint_DrawString_EN(humidityPixelCoordinates.x, humidityPixelCoordinates.y, humidityText, &Font16, WHITE, BLACK);
+    Paint_DrawString_EN(clockPixelCoordinates.x, clockPixelCoordinates.y, displayState->clockText, &Font18, WHITE, BLACK);
+    Paint_DrawString_EN(temperaturePixelCoordinates.x, temperaturePixelCoordinates.y, displayState->temperatureText, &Font48, WHITE, BLACK);
+    Paint_DrawString_EN(humidityPixelCoordinates.x, humidityPixelCoordinates.y, displayState->humidityText, &Font16, WHITE, BLACK);
 
     EPD_display(Image_Mono);
+
+    currentDisplayState = *displayState;
 }
 
 static void initRenderGrid(void)

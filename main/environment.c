@@ -5,6 +5,7 @@
 #include "shtc3_bsp.h"
 #include "pcf85063_bsp.h"
 
+#include "./environment_types.h"
 #include "./environment.h"
 
 // Log tag
@@ -12,6 +13,11 @@ static const char *TAG = "environment";
 
 static float cacheTemperatureC = 0;
 static float cacheRelativeHumidity = 0;
+static int readTryCount = 0;
+
+int getReadTryCount() {
+    return readTryCount;
+}
 
 enum env_error initEnvironment(void)
 {
@@ -31,8 +37,13 @@ enum env_error initEnvironment(void)
 enum env_error readTemperatureAndHumidity(float *stateTemperatureC, float *stateRelativeHumidity)
 {
     ESP_LOGI(TAG,"2.Temperature sensor read...");
+    readTryCount++;
 
     const int SHTC3Status = SHTC3_GetEnvTemperatureHumidity(stateTemperatureC, stateRelativeHumidity);
+
+    if(readTryCount > 5) {
+        return ENV_FAIL;
+    }
 
     if (SHTC3Status != 0) {
         *stateTemperatureC = cacheTemperatureC;
@@ -43,20 +54,31 @@ enum env_error readTemperatureAndHumidity(float *stateTemperatureC, float *state
         return ENV_WARNING;
     }
 
+    readTryCount = 0;
     cacheTemperatureC = *stateTemperatureC;
     cacheRelativeHumidity = *stateRelativeHumidity;
 
     return ENV_SUCCESS;
 }
 
-void readClock(char *clockText, size_t clockTextSize)
+enum env_error getCurrentTime(TimeDate *currentTime)
 {
-    const Time_data currentTime = PCF85063_GetTime();
-    
-    if (currentTime.hours > 23 || currentTime.minutes > 59) {
-        snprintf(clockText, clockTextSize, "--:--");
-        return;
+    Time_data currentTimeRead = PCF85063_GetTime();
+
+    if (currentTimeRead.hours > 23 || currentTimeRead.minutes > 59) {
+        ESP_LOGE(TAG, "Failed to read current time from PCF85063 RTC!");
+        return ENV_FAIL;
     }
 
-    snprintf(clockText, clockTextSize, "%02u:%02u", (unsigned)currentTime.hours, (unsigned)currentTime.minutes);
+    *currentTime = (TimeDate){
+        .years = currentTimeRead.years,
+        .months = currentTimeRead.months,
+        .days = currentTimeRead.days,
+        .hours = currentTimeRead.hours,
+        .minutes = currentTimeRead.minutes,
+        .seconds = currentTimeRead.seconds,
+        .week = currentTimeRead.week
+    };
+
+    return ENV_SUCCESS;
 }

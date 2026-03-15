@@ -1,6 +1,9 @@
 #ifndef DOG_CRATE_MONITOR_DISPLAY_H
 #define DOG_CRATE_MONITOR_DISPLAY_H
 
+#include "display_types.h"
+#include "environment_types.h"
+
 enum display_error {
     DISPLAY_SUCCESS = 0,
     DISPLAY_WARNING = 1,
@@ -8,6 +11,6 @@ enum display_error {
 };
 
 enum display_error initDisplay(void);
-void renderToDisplay(float stateTemperatureC, float stateRelativeHumidity, const char *clockText);
+void renderToDisplay(DisplayState *displayState);
 
 #endif // DOG_CRATE_MONITOR_DISPLAY_H
