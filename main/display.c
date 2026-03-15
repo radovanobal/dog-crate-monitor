@@ -63,6 +63,15 @@ static bool isDisplayStateChanged(const DisplayState *left, const DisplayState *
         ;
 }
 
+static bool isClockStateChanged(const DisplayState *left, const DisplayState *right) {
+    return strcmp(left->clockText, right->clockText) != 0;
+}
+
+static bool isSensorStateChanged(const DisplayState *left, const DisplayState *right) {
+    return strcmp(left->temperatureText, right->temperatureText) != 0 
+        || strcmp(left->humidityText, right->humidityText) != 0;
+}
+
 void renderToDisplay(DisplayState *displayState)
 {
     ESP_LOGI(TAG,"3.e-Paper Draw 0...");
@@ -91,7 +100,7 @@ void renderToDisplay(DisplayState *displayState)
     Paint_DrawString_EN(temperaturePixelCoordinates.x, temperaturePixelCoordinates.y, displayState->temperatureText, &Font48, WHITE, BLACK);
     Paint_DrawString_EN(humidityPixelCoordinates.x, humidityPixelCoordinates.y, displayState->humidityText, &Font16, WHITE, BLACK);
 
-    EPD_display(Image_Mono);
+    EPD_Display_Base(Image_Mono);
 
     currentDisplayState = *displayState;
 }
