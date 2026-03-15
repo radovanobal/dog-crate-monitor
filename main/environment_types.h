@@ -1,6 +1,8 @@
 #ifndef DOG_CRATE_MONITOR_ENVIRONMENT_TYPES_H
 #define DOG_CRATE_MONITOR_ENVIRONMENT_TYPES_H
 
+#include <stdint.h>
+
 enum env_error {
     ENV_SUCCESS = 0,
     ENV_WARNING = 1,

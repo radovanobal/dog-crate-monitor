@@ -41,11 +41,11 @@ enum env_error readTemperatureAndHumidity(float *stateTemperatureC, float *state
 
     const int SHTC3Status = SHTC3_GetEnvTemperatureHumidity(stateTemperatureC, stateRelativeHumidity);
 
-    if(readTryCount > 5) {
-        return ENV_FAIL;
-    }
-
     if (SHTC3Status != 0) {
+        if(readTryCount > 5) {
+            return ENV_FAIL;
+        }
+        
         *stateTemperatureC = cacheTemperatureC;
         *stateRelativeHumidity = cacheRelativeHumidity;
         

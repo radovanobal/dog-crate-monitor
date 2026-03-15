@@ -2,6 +2,7 @@
 #define DOG_CRATE_MONITOR_DISPLAY_TYPES_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 struct GridConfig {
     int width;
