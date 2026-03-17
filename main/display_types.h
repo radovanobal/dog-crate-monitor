@@ -45,5 +45,18 @@ typedef struct {
     bool showBattery;
 }DisplayState;
 
+typedef enum {
+    DISPLAY_REGION_CLOCK = 0,
+    DISPLAY_REGION_TEMPERATURE = 1,
+    DISPLAY_REGION_HUMIDITY = 2,
+    DISPLAY_REGION_ALERT = 3,
+}DisplayRegionId;
+
+typedef struct {
+    DisplayRegionId id;
+    struct GridRegion gridRegion;
+    struct PixelRegion pixelRegion;
+}DisplayRegionDescriptor;
+
 
 #endif // DOG_CRATE_MONITOR_DISPLAY_TYPES_H

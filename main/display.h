@@ -12,5 +12,6 @@ enum display_error {
 
 enum display_error initDisplay(void);
 void renderToDisplay(DisplayState *displayState);
+void partialRenderToDisplay(DisplayState *displayState);
 
 #endif // DOG_CRATE_MONITOR_DISPLAY_H

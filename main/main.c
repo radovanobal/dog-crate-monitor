@@ -18,6 +18,7 @@
 static float stateTemperatureC;
 static float stateRelativeHumidity;
 static TimeDate currentTime;
+static bool isFirstRun = true;
 
 static void initCommunications(void);
 static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate currentTime);
@@ -44,11 +45,19 @@ void app_main(void)
         
         if (status != ENV_FAIL) {
             DisplayState displayState = readyDisplayState(stateTemperatureC, stateRelativeHumidity, currentTime);
-            renderToDisplay(&displayState);
+            //renderToDisplay(&displayState);
+
+            if (isFirstRun) {
+                renderToDisplay(&displayState);
+            } else {
+                partialRenderToDisplay(&displayState);
+            }
+
+            isFirstRun = false;
         }
 
         if (status == ENV_SUCCESS) {
-            vTaskDelay(pdMS_TO_TICKS(60000)); // Delay for 1 minute before the next reading
+            vTaskDelay(pdMS_TO_TICKS(15000)); // Delay for 15 seconds before the next reading
         } else if(status == ENV_WARNING) {
             vTaskDelay(pdMS_TO_TICKS(2000)); // Delay for 2s
         } else {
