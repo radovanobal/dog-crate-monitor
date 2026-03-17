@@ -18,7 +18,9 @@
 static float stateTemperatureC;
 static float stateRelativeHumidity;
 static TimeDate currentTime;
-static bool isFirstRun = true;
+static int partialRenderCount = 0;
+static int maxPartialRenderCount = 100;
+static bool isFullRenderRequired = true;
 
 static void initCommunications(void);
 static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate currentTime);
@@ -45,15 +47,20 @@ void app_main(void)
         
         if (status != ENV_FAIL) {
             DisplayState displayState = readyDisplayState(stateTemperatureC, stateRelativeHumidity, currentTime);
-            //renderToDisplay(&displayState);
 
-            if (isFirstRun) {
+            if (isFullRenderRequired) {
                 renderToDisplay(&displayState);
+                isFullRenderRequired = false;
             } else {
                 partialRenderToDisplay(&displayState);
             }
 
-            isFirstRun = false;
+            partialRenderCount++;
+
+            if(partialRenderCount >= maxPartialRenderCount) {
+                partialRenderCount = 0;
+                isFullRenderRequired = true;
+            }
         }
 
         if (status == ENV_SUCCESS) {

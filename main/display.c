@@ -153,6 +153,11 @@ static void renderRegionToDisplay(struct GridRegion displayRegion, struct PixelC
 
 
         /*
+
+        When the driver supports partial update, use the code below to update the corresponding region of the screen. 
+        Otherwise, use full screen partial update. The driver first needs to be able to update the region and snyc the
+        buffer with the region image, then partial update can be used to update the region on screen.
+
         EPD_Display_Partial(
             ImagePartialMono,
             pixelRegion.x,
