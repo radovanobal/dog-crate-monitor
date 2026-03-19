@@ -28,7 +28,7 @@ static int cellHeight;
 uint8_t *ImageMonoBuffer;
 
 // Log tag
-static const char *TAG = "main";
+static const char *TAG = "display";
 
 static void initRenderGrid(void);
 static void initRenderRegions(void);
