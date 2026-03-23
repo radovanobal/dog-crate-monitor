@@ -17,6 +17,6 @@ typedef struct{
     uint16_t minutes;
     uint16_t seconds;
     uint16_t week;
-}TimeDate;
+} TimeDate;
 
 #endif //DOG_CRATE_MONITOR_ENVIRONMENT_TYPES_H
