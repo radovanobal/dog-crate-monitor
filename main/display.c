@@ -5,6 +5,8 @@
 #include "./environment_types.h"
 #include "./display_types.h"
 #include "./display.h"
+#include "./app_event.h"
+#include "./app_store.h"
 
 // Define the grid dimensions
 static const struct GridConfig gridConfig = {
@@ -38,8 +40,10 @@ static struct PixelCoordinates2D pixelRegionTopCenter(struct PixelRegion pixelRe
 static struct PixelCoordinates2D pixelRegionTopRight(struct PixelRegion pixelRegion, struct PixelSize2D itemSize);
 static struct PixelRegion regionToPixelSpace(struct GridRegion gridRegion);
 static void updateMonoImageBuffer(struct PixelRegion pixelRegion, uint8_t *ImagePartialMono, uint8_t *ImageMonoBuffer);
+static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate stateCurrentTime);
 
-static DisplayState currentDisplayState = {0};
+static DisplayState lastPaintedDisplayState = {0};
+static DisplayState lastEnqueuedDisplayState = {0};
 
 enum display_error initDisplay(void)
 {
@@ -101,12 +105,12 @@ void partialRenderToDisplay(DisplayState *displayState)
 {
     ESP_LOGI(TAG,"4.e-Paper Partial Draw 0...");
 
-    if (!isDisplayStateChanged(&currentDisplayState, displayState)) {
+    if (!isDisplayStateChanged(&lastPaintedDisplayState, displayState)) {
         ESP_LOGI(TAG,"Display state has not changed, skipping render.");
         return;
     }
 
-    if (isClockStateChanged(&currentDisplayState, displayState)) {
+    if (isClockStateChanged(&lastPaintedDisplayState, displayState)) {
         const struct GridRegion clockRegion = displayRegions[DISPLAY_REGION_CLOCK].gridRegion;
         const struct PixelRegion pixelRegion = displayRegions[DISPLAY_REGION_CLOCK].pixelRegion;
         const struct PixelSize2D textBoxSize = (struct PixelSize2D){ .width = strlen(displayState->clockText) * Font18.Width, .height = Font18.Height };
@@ -114,7 +118,7 @@ void partialRenderToDisplay(DisplayState *displayState)
         renderRegionToDisplay(clockRegion, clockTextPosition, displayState->clockText, &Font18);
     }
 
-    if (isTemperatureStateChanged(&currentDisplayState, displayState)) {
+    if (isTemperatureStateChanged(&lastPaintedDisplayState, displayState)) {
         const struct GridRegion temperatureRegion = displayRegions[DISPLAY_REGION_TEMPERATURE].gridRegion;
         const struct PixelRegion pixelTemperatureRegion = displayRegions[DISPLAY_REGION_TEMPERATURE].pixelRegion;
         const struct PixelSize2D textBoxSize = (struct PixelSize2D){ .width = strlen(displayState->temperatureText) * Font48.Width, .height = Font48.Height };
@@ -122,7 +126,7 @@ void partialRenderToDisplay(DisplayState *displayState)
         renderRegionToDisplay(temperatureRegion, temperatureTextPosition, displayState->temperatureText, &Font48);
     }
 
-    if(isHumidityStateChanged(&currentDisplayState, displayState)) {
+    if(isHumidityStateChanged(&lastPaintedDisplayState, displayState)) {
         const struct GridRegion humidityRegion = displayRegions[DISPLAY_REGION_HUMIDITY].gridRegion;
         const struct PixelRegion pixelHumidityRegion = displayRegions[DISPLAY_REGION_HUMIDITY].pixelRegion;
         const struct PixelSize2D humidityTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->humidityText) * Font16.Width, .height = Font16.Height };
@@ -130,7 +134,7 @@ void partialRenderToDisplay(DisplayState *displayState)
         renderRegionToDisplay(humidityRegion, humidityTextPosition, displayState->humidityText, &Font16);
     }
     
-    currentDisplayState = *displayState;
+    lastPaintedDisplayState = *displayState;
 }
 
 static void renderRegionToDisplay(struct GridRegion displayRegion, struct PixelCoordinates2D textPosition, const char displayText[16], sFONT *font) {
@@ -182,7 +186,7 @@ void renderToDisplay(DisplayState *displayState)
 {
     ESP_LOGI(TAG,"3.e-Paper Draw 0...");
 
-    if (!isDisplayStateChanged(&currentDisplayState, displayState)) {
+    if (!isDisplayStateChanged(&lastPaintedDisplayState, displayState)) {
         ESP_LOGI(TAG,"Display state has not changed, skipping render.");
         return;
     }
@@ -212,7 +216,33 @@ void renderToDisplay(DisplayState *displayState)
 
     EPD_Display_Base(ImageMonoBuffer);
 
-    currentDisplayState = *displayState;
+    lastPaintedDisplayState = *displayState;
+}
+
+void homeScreen_setLastEnqueuedDisplayState(const DisplayState *displayState) {
+    lastEnqueuedDisplayState = *displayState;
+}
+
+HomeScreenResult homeScreen_handleEvent(const AppEvent *event, const AppState *appState) {
+    // Handle events specific to the home screen and determine if a render is required
+    // For example, you can check if the event is an environment update and if the relevant display state has changed
+
+    HomeScreenResult result = { .isRenderRequired = false };
+
+    if (event->eventType == APP_EVENT_ENVIRONMENT_UPDATED) {
+        DisplayState newDisplayState = readyDisplayState(
+            appState->sharedState.environmentState.temperatureC, 
+            appState->sharedState.environmentState.relativeHumidity, 
+            appState->sharedState.environmentState.currentTime
+        );
+
+        if (isDisplayStateChanged(&lastEnqueuedDisplayState, &newDisplayState)) {
+            result.isRenderRequired = true;
+            result.displayState = newDisplayState;
+        }
+    }
+
+    return result;
 }
 
 static void initRenderGrid(void)
@@ -281,4 +311,23 @@ static void updateMonoImageBuffer(struct PixelRegion pixelRegion, uint8_t *Image
             regionStride
         );
     }
+}
+
+static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate stateCurrentTime) {
+    DisplayState displayState = {0};
+    snprintf(displayState.temperatureText, sizeof(displayState.temperatureText), "%.1fC", stateTemperatureC);
+    snprintf(displayState.humidityText, sizeof(displayState.humidityText), "%.1f%%", stateRelativeHumidity);
+
+    if (stateCurrentTime.hours > 23 || stateCurrentTime.minutes > 59) {
+        snprintf(displayState.clockText, sizeof(displayState.clockText), "--:--");
+    } else {
+        snprintf(displayState.clockText, sizeof(displayState.clockText), "%02u:%02u", (unsigned)stateCurrentTime.hours, (unsigned)stateCurrentTime.minutes);
+    }
+
+    displayState.showEnvironmentWarning = false;
+    displayState.showBluetooth = false;
+    displayState.showWifi = false;
+    displayState.showBattery = false;
+
+    return displayState;
 }

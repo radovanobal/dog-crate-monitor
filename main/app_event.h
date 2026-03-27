@@ -2,19 +2,12 @@
 #define DOG_CRATE_MONITOR_APP_EVENT_H
 
 #include "./environment_types.h"
+#include "button_event.h"
 
 typedef enum {
     APP_EVENT_ENVIRONMENT_UPDATED = 0,
     APP_EVENT_INPUT_RECEIVED = 1
 } AppEventType;
-
-typedef enum {
-    INPUT_ACTION_ROTARY_ENCODER_UP = 0,
-    INPUT_ACTION_ROTARY_ENCODER_DOWN = 1,
-    INPUT_ACTION_ROTARY_ENCODER_PRESS = 2,
-    INPUT_ACTION_BUTTON_BACK = 3, // Hardware button label: pwr
-    INPUT_ACTION_BUTTON_SELECT = 4, // Hardware button label: boot
-} InputAction;
 
 typedef struct {
     float temperatureC;
@@ -23,18 +16,19 @@ typedef struct {
 } EnvironmentUpdateData;
 
 typedef struct {
-    InputAction action;
+    ButtonType buttonType;
+    ButtonPressType pressType;
 } InputEventData;
 
 typedef struct {
     AppEventType eventType;
     union {
-        EnvironmentUpdateData sensorUpdateData;
+        EnvironmentUpdateData environmentUpdateData;
         InputEventData inputEventData;
     } data;
 } AppEvent;
 
 AppEvent appEvent_createEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, TimeDate currentTime);
-AppEvent appEvent_createInputEvent(InputAction action);
+AppEvent appEvent_createInputEvent(ButtonType buttonType, ButtonPressType pressType);
 
 #endif // DOG_CRATE_MONITOR_APP_EVENT_H

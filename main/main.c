@@ -7,6 +7,8 @@
 #include "./display.h"
 #include "./environment.h"
 #include "./task_manager.h"
+#include "./app_dispatcher.h"
+#include "./button_event.h"
 
 // Log tag
 static const char *TAG = "main";
@@ -17,6 +19,8 @@ static void initCommunications(void);
 void app_main(void)
 {
     initCommunications();
+    initAppDispatcher();
+    buttonEvent_init();
 
     if(initEnvironment() != ENV_SUCCESS) {
         return;
@@ -37,6 +41,11 @@ void app_main(void)
 
     if(xTaskCreatePinnedToCore(renderTask, "renderTask", 4096, NULL, 4, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create Render task");
+        return;
+    }
+
+    if(xTaskCreatePinnedToCore(inputTask, "inputTask", 4096, NULL, 5, NULL, 0) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create Input task");
         return;
     }
 

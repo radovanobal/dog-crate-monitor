@@ -4,7 +4,7 @@
 AppEvent appEvent_createEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, TimeDate currentTime) {
     AppEvent event = {
         .eventType = APP_EVENT_ENVIRONMENT_UPDATED,
-        .data.sensorUpdateData = {
+        .data.environmentUpdateData = {
             .temperatureC = temperatureC,
             .relativeHumidity = relativeHumidity,
             .currentTime = currentTime
@@ -13,11 +13,12 @@ AppEvent appEvent_createEnvironmentUpdateEvent(float temperatureC, float relativ
     return event;
 }
 
-AppEvent appEvent_createInputEvent(InputAction action) {
+AppEvent appEvent_createInputEvent(ButtonType buttonType, ButtonPressType pressType) {
     AppEvent event = {
         .eventType = APP_EVENT_INPUT_RECEIVED,
         .data.inputEventData = {
-            .action = action
+            .buttonType = buttonType,
+            .pressType = pressType
         }
     };
     return event;

@@ -11,8 +11,10 @@
 #include "./environment_types.h"
 #include "./environment.h"
 #include "./display.h"
+#include "./app_event.h"
+#include "./app_dispatcher.h"
+#include "./button_event.h"
 
-static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate currentTime);
 
 // Log tag
 static const char *TAG = "task_manager";
@@ -32,26 +34,27 @@ task_manager_error initTaskManager() {
     return TASK_MANAGER_SUCCESS;
 }
 
-
 void uiTask(void *pvParameters) {
-    AppEvent event;
     DisplayState currentDisplayState = {0};
     int partialRenderCount = maxPartialRenderCount;
  
     ESP_LOGI(TAG, "UI Task started");
 
     for(;;) {
+        AppEvent event;
+
         if(xQueueReceive(appEventQueue, &event, portMAX_DELAY) == pdPASS) {
             ESP_LOGI(TAG, "Received app event of type: %d", event.eventType);
 
-            switch (event.eventType) {
-                case APP_EVENT_ENVIRONMENT_UPDATED:
-                    currentDisplayState = readyDisplayState(
-                        event.sensorUpdateData.temperatureC, 
-                        event.sensorUpdateData.relativeHumidity, 
-                        event.timeUpdateData
-                    );
-                    break;
+            appDispatcher_dispatchEvent(&event);
+            const AppState *state = appDispatcher_getAppState();
+            HomeScreenResult homeScreenResult = homeScreen_handleEvent(&event, state);
+
+            if (homeScreenResult.isRenderRequired) {
+                 currentDisplayState = homeScreenResult.displayState;
+            } else {
+                ESP_LOGI(TAG, "No render required for this event");
+                continue;
             }
 
             bool isFullRenderRequired = partialRenderCount >= maxPartialRenderCount;
@@ -68,6 +71,8 @@ void uiTask(void *pvParameters) {
 
             if(xQueueSend(displayQueue, &displayRequest, pdMS_TO_TICKS(10)) != pdTRUE) {
                 ESP_LOGW(TAG, "Failed to send display request to queue");
+            } else {
+                homeScreen_setLastEnqueuedDisplayState(&currentDisplayState);
             }
 
             if (!isFullRenderRequired) {
@@ -100,6 +105,31 @@ void renderTask(void *pvParameters) {
     }
 }
 
+void inputTask(void *pvParameters) {
+    ESP_LOGI(TAG, "Input Task started");
+
+    for(;;) {
+        ButtonEvent buttonEvent;
+
+        if (!buttonEvent_wait(&buttonEvent, portMAX_DELAY)) {
+            ESP_LOGW(TAG, "Failed to receive button event");
+            continue;
+        }
+
+        AppEvent appEvent = {
+            .eventType = APP_EVENT_INPUT_RECEIVED,
+            .data.inputEventData = {
+                .buttonType = buttonEvent.buttonType,
+                .pressType = buttonEvent.pressType,
+            }
+        };
+
+        if(xQueueSend(appEventQueue, &appEvent, pdMS_TO_TICKS(10)) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to send input event to queue");
+        }
+    }
+}
+
 void serviceTask(void *pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     float stateTemperatureC;
@@ -123,38 +153,12 @@ void serviceTask(void *pvParameters) {
             ESP_LOGW(TAG, "Environment data or time is in warning state");
         }
 
-        AppEvent environmentEvent = {
-            .eventType = APP_EVENT_ENVIRONMENT_UPDATED,
-            .sensorUpdateData = {
-                .temperatureC = stateTemperatureC,
-                .relativeHumidity = stateRelativeHumidity
-            },
-            .timeUpdateData = currentTime
-        };
-
+        AppEvent environmentEvent = appEvent_createEnvironmentUpdateEvent(stateTemperatureC, stateRelativeHumidity, currentTime);
+        
         if(xQueueSend(appEventQueue, &environmentEvent, pdMS_TO_TICKS(10)) != pdTRUE) {
             ESP_LOGW(TAG, "Failed to send environment event to queue");
         }
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(delayDuration)); // Delay before the next reading
     }
-}
-
-static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate stateCurrentTime) {
-    DisplayState displayState = {0};
-    snprintf(displayState.temperatureText, sizeof(displayState.temperatureText), "%.1fC", stateTemperatureC);
-    snprintf(displayState.humidityText, sizeof(displayState.humidityText), "%.1f%%", stateRelativeHumidity);
-
-    if (stateCurrentTime.hours > 23 || stateCurrentTime.minutes > 59) {
-        snprintf(displayState.clockText, sizeof(displayState.clockText), "--:--");
-    } else {
-        snprintf(displayState.clockText, sizeof(displayState.clockText), "%02u:%02u", (unsigned)stateCurrentTime.hours, (unsigned)stateCurrentTime.minutes);
-    }
-
-    displayState.showEnvironmentWarning = false;
-    displayState.showBluetooth = false;
-    displayState.showWifi = false;
-    displayState.showBattery = false;
-
-    return displayState;
 }
