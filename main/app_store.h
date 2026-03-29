@@ -2,17 +2,13 @@
 #define DOG_CRATE_MONITOR_APP_STORE_H
 
 #include "./environment_types.h"
+#include "./screen_types.h"
 
 typedef struct {
     TimeDate currentTime;
     float temperatureC;
     float relativeHumidity;
 } EnvironmentState;
-
-typedef enum {
-    SCREEN_ID_HOME = 0,
-    SCREEN_ID_MENU = 1
-} ScreenId;
 
 typedef struct {
     ScreenId activeScreen;

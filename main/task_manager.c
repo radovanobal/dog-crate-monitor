@@ -10,15 +10,14 @@
 #include "./utils.h"
 #include "./environment_types.h"
 #include "./environment.h"
-#include "./display.h"
 #include "./app_event.h"
 #include "./app_dispatcher.h"
 #include "./button_event.h"
+#include "./screen_manager.h"
 
 
 // Log tag
 static const char *TAG = "task_manager";
-static int maxPartialRenderCount = 100;
 static QueueHandle_t displayQueue = NULL;
 static QueueHandle_t appEventQueue = NULL;
 
@@ -34,50 +33,44 @@ task_manager_error initTaskManager() {
     return TASK_MANAGER_SUCCESS;
 }
 
-void uiTask(void *pvParameters) {
-    DisplayState currentDisplayState = {0};
-    int partialRenderCount = maxPartialRenderCount;
- 
+void uiTask(void *pvParameters) { 
     ESP_LOGI(TAG, "UI Task started");
 
     for(;;) {
         AppEvent event;
 
-        if(xQueueReceive(appEventQueue, &event, portMAX_DELAY) == pdPASS) {
-            ESP_LOGI(TAG, "Received app event of type: %d", event.eventType);
+        if(xQueueReceive(appEventQueue, &event, portMAX_DELAY) != pdPASS) {
+            ESP_LOGW(TAG, "Failed to receive app event from queue");
+            continue;
+        }
 
-            appDispatcher_dispatchEvent(&event);
-            const AppState *state = appDispatcher_getAppState();
-            HomeScreenResult homeScreenResult = homeScreen_handleEvent(&event, state);
+        ESP_LOGI(TAG, "Received app event of type: %d", event.eventType);
+        const AppState *state = appDispatcher_getAppState();
 
-            if (homeScreenResult.isRenderRequired) {
-                 currentDisplayState = homeScreenResult.displayState;
-            } else {
-                ESP_LOGI(TAG, "No render required for this event");
-                continue;
-            }
+        ScreenActionResult actionResult = screenManager_handleEvent(&event, state);
+        appDispatcher_dispatchEvent(&event);
 
-            bool isFullRenderRequired = partialRenderCount >= maxPartialRenderCount;
-            DisplayPaintType paintType = DISPLAY_PAINT_TYPE_PARTIAL;
-            if (isFullRenderRequired) {
-                partialRenderCount = 0;
-                paintType = DISPLAY_PAINT_TYPE_FULL;
-            }
-            
-            DisplayRequest displayRequest = {
-                .paintType = paintType,
-                .displayState = currentDisplayState
-            };
+        if (actionResult.screenIntent.intentType != SCREEN_INTENT_TYPE_NONE) {
+            appDispatcher_applyScreenIntent(&actionResult.screenIntent);
+        }
 
-            if(xQueueSend(displayQueue, &displayRequest, pdMS_TO_TICKS(10)) != pdTRUE) {
-                ESP_LOGW(TAG, "Failed to send display request to queue");
-            } else {
-                homeScreen_setLastEnqueuedDisplayState(&currentDisplayState);
-            }
+        ScreenRenderResult renderResult = screenManager_evaluateDisplay(state);
 
-            if (!isFullRenderRequired) {
-                partialRenderCount++;
-            }
+        if (!renderResult.isRenderRequired) {
+            ESP_LOGI(
+                TAG, "Screen render not required after handling event of type: %d",
+                event.eventType
+            );
+            continue;
+        }
+
+        const ScreenId activeScreenId = state->sharedState.navigationState.activeScreen;
+        DisplayRequest displayRequest = screenManager_buildDisplayRequest(activeScreenId, &renderResult.displayState);
+
+        if(xQueueSend(displayQueue, &displayRequest, pdMS_TO_TICKS(10)) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to send display request to queue");
+        } else {
+            screenManager_setLastEnqueuedDisplayState(&displayRequest);
         }
     }
 }
@@ -93,14 +86,17 @@ void renderTask(void *pvParameters) {
                 displayRequest.paintType == DISPLAY_PAINT_TYPE_FULL ? "FULL" : "PARTIAL"
             );
 
-            switch (displayRequest.paintType) {
-                case DISPLAY_PAINT_TYPE_FULL:
-                    renderToDisplay(&displayRequest.displayState);
-                    break;
-                case DISPLAY_PAINT_TYPE_PARTIAL:
-                    partialRenderToDisplay(&displayRequest.displayState);
-                    break;    
+            const AppState *state = appDispatcher_getAppState();
+            const ScreenId screenId = state->sharedState.navigationState.activeScreen;
+
+            if (displayRequest.screenId != screenId) {
+                ESP_LOGW(TAG, "Display request screen ID %d does not match active screen ID %d. Ignoring render request.",
+                    displayRequest.screenId, screenId
+                );
+                continue;
             }
+
+            screenManager_render(&displayRequest);
         }
     }
 }

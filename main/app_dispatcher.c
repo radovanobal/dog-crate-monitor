@@ -17,8 +17,10 @@ void appDispatcher_dispatchEvent(const AppEvent *event) {
             );
             break;
         case APP_EVENT_INPUT_RECEIVED:
-            appDispatcher_handleInputEvent();
-            break;    
+             // Currently, input events are handled directly in the screen manager's handleEvent function, so we don't need to do anything here. If there were any global input handling logic that needed to be applied regardless of the active screen, it could be implemented here.
+             break;    
+        default:
+            break;
     }
 }
 
@@ -27,8 +29,10 @@ void appDispatcher_handleEnvironmentUpdateEvent(float temperatureC, float relati
     appStore_updateEnvironmentState(&appState, temperatureC, relativeHumidity, currentTime);
 }
 
-void appDispatcher_handleInputEvent() {
-    // Handle input events and update app state as needed
+void appDispatcher_applyScreenIntent(const ScreenIntent *intent) {
+    if (intent->intentType == SCREEN_INTENT_SET_ACTIVE_SCREEN) {
+        appStore_updateNavigationState(&appState, intent->data.screenId);
+    }
 }
 
 const AppState *appDispatcher_getAppState() {

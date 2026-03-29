@@ -1,6 +1,7 @@
 
 #include "./app_store.h"
 #include "./environment_types.h"
+#include "./screen_types.h"
 
 static void initEnvironment(AppState *appState);
 static void initScreenState(AppState *appState);

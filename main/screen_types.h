@@ -1,0 +1,9 @@
+#ifndef DOG_CRATE_MONITOR_SCREEN_TYPES_H
+#define DOG_CRATE_MONITOR_SCREEN_TYPES_H    
+
+typedef enum {
+    SCREEN_ID_HOME = 0,
+    SCREEN_ID_MENU = 1
+} ScreenId;
+
+#endif // DOG_CRATE_MONITOR_SCREEN_TYPES_H

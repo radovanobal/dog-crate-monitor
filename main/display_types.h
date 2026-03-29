@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "./screen_types.h"
 
 struct GridConfig {
     int width;
@@ -58,5 +59,16 @@ typedef struct {
     struct PixelRegion pixelRegion;
 }DisplayRegionDescriptor;
 
+typedef enum {
+    DISPLAY_PAINT_TYPE_FULL,
+    DISPLAY_PAINT_TYPE_PARTIAL
+} DisplayPaintType;
+
+typedef struct {
+    ScreenId screenId;
+    DisplayPaintType paintType;
+//    DisplayRegionId regionId;
+    DisplayState displayState;
+} DisplayRequest;
 
 #endif // DOG_CRATE_MONITOR_DISPLAY_TYPES_H

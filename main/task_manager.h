@@ -1,7 +1,6 @@
 #ifndef DOG_CRATE_MONITOR_TASK_MANAGER_H
 #define DOG_CRATE_MONITOR_TASK_MANAGER_H
 
-#include "display_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
@@ -17,16 +16,5 @@ void uiTask(void *pvParameters);
 void renderTask(void *pvParameters);
 void inputTask(void *pvParameters);
 void serviceTask(void *pvParameters);
-
-typedef enum {
-    DISPLAY_PAINT_TYPE_FULL,
-    DISPLAY_PAINT_TYPE_PARTIAL
-} DisplayPaintType;
-
-typedef struct {
-    DisplayPaintType paintType;
-//    DisplayRegionId regionId;
-    DisplayState displayState;
-} DisplayRequest;
 
 #endif //DOG_CRATE_MONITOR_TASK_MANAGER_H
