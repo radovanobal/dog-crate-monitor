@@ -3,24 +3,23 @@
 
 #include "esp_log.h"
 #include "i2c_bsp.h"
-#include "epaper_port.h"
 
 #include "./environment.h"
 #include "./task_manager.h"
 #include "./app_dispatcher.h"
 #include "./button_event.h"
+#include "./display_controller.h"
 
 // Log tag
 static const char *TAG = "main";
 
 static void initCommunications(void);
-static void initEpaperDisplay(void);
 
 void app_main(void)
 {
     initCommunications();
-    initAppDispatcher();
-    initEpaperDisplay();
+    displayController_init();
+    appDispatcher_init();
     buttonEvent_init();
 
     if(initEnvironment() != ENV_SUCCESS) {
@@ -31,7 +30,7 @@ void app_main(void)
         return;
     }
 
-    if(xTaskCreatePinnedToCore(uiTask, "uiTask", 4096, NULL, 5, NULL, 0) != pdPASS) {
+    if(xTaskCreatePinnedToCore(uiTask, "uiTask", 8192, NULL, 5, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UI task");
         return;
     }   
@@ -50,14 +49,6 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to create Service task");
         return;
     }
-}
-
-static void initEpaperDisplay(void) {
-    ESP_LOGI(TAG,"1.e-Paper Init and Clear...");
-    epaper_port_init();
-    EPD_Init();
-    EPD_Clear();
-    vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
 static void initCommunications(void)

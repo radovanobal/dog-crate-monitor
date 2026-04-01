@@ -3,7 +3,7 @@
 
 AppState appState;
 
-void initAppDispatcher() {
+void appDispatcher_init() {
     appStore_initAppState(&appState);
 }
 

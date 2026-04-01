@@ -14,10 +14,11 @@
 #include "./app_dispatcher.h"
 #include "./button_event.h"
 #include "./screen_manager.h"
-
+#include "./display_controller.h"
 
 // Log tag
 static const char *TAG = "task_manager";
+
 static QueueHandle_t displayQueue = NULL;
 static QueueHandle_t appEventQueue = NULL;
 
@@ -38,7 +39,7 @@ void uiTask(void *pvParameters) {
 
     for(;;) {
         AppEvent event;
-
+            
         if(xQueueReceive(appEventQueue, &event, portMAX_DELAY) != pdPASS) {
             ESP_LOGW(TAG, "Failed to receive app event from queue");
             continue;
@@ -46,6 +47,7 @@ void uiTask(void *pvParameters) {
 
         ESP_LOGI(TAG, "Received app event of type: %d", event.eventType);
         const AppState *state = appDispatcher_getAppState();
+        const ScreenGeneration previousScreenGeneration = state->sharedState.navigationState.screenGeneration;
 
         ScreenActionResult actionResult = screenManager_handleEvent(&event, state);
         appDispatcher_dispatchEvent(&event);
@@ -54,9 +56,21 @@ void uiTask(void *pvParameters) {
             appDispatcher_applyScreenIntent(&actionResult.screenIntent);
         }
 
+        const ScreenId activeScreenId = state->sharedState.navigationState.activeScreen;
+        const ScreenGeneration screenGeneration = state->sharedState.navigationState.screenGeneration;
+
+        if (screenGeneration != previousScreenGeneration) {
+            ESP_LOGI(TAG,
+                "Screen generation changed from %u to %u. Resetting display queue.",
+                (unsigned)previousScreenGeneration,
+                (unsigned)screenGeneration
+            );
+            xQueueReset(displayQueue);
+        }
+
         ScreenRenderResult renderResult = screenManager_evaluateDisplay(state);
 
-        if (!renderResult.isRenderRequired) {
+        if (renderResult.displayRenderPlan.count == 0) {
             ESP_LOGI(
                 TAG, "Screen render not required after handling event of type: %d",
                 event.eventType
@@ -64,40 +78,42 @@ void uiTask(void *pvParameters) {
             continue;
         }
 
-        const ScreenId activeScreenId = state->sharedState.navigationState.activeScreen;
-        DisplayRequest displayRequest = screenManager_buildDisplayRequest(activeScreenId, &renderResult.displayState);
+        DisplayRequest displayRequest = screenManager_buildDisplayRequest(
+            activeScreenId, 
+            screenGeneration, 
+            &renderResult
+        );
 
-        if(xQueueSend(displayQueue, &displayRequest, pdMS_TO_TICKS(10)) != pdTRUE) {
-            ESP_LOGW(TAG, "Failed to send display request to queue");
-        } else {
-            screenManager_setLastEnqueuedDisplayState(&displayRequest);
+        if (xQueueSend(displayQueue, &displayRequest, pdMS_TO_TICKS(10)) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to enqueue display request");
+            continue;
         }
     }
 }
 
 void renderTask(void *pvParameters) {
-    DisplayRequest displayRequest;
-
     ESP_LOGI(TAG, "Render Task started");
+    DisplayRequest renderResult;
 
     for(;;) {
-        if(xQueueReceive(displayQueue, &displayRequest, portMAX_DELAY) == pdPASS) {
-            ESP_LOGI(TAG, "Received display request with paint type: %s", 
-                displayRequest.paintType == DISPLAY_PAINT_TYPE_FULL ? "FULL" : "PARTIAL"
-            );
-
-            const AppState *state = appDispatcher_getAppState();
-            const ScreenId screenId = state->sharedState.navigationState.activeScreen;
-
-            if (displayRequest.screenId != screenId) {
-                ESP_LOGW(TAG, "Display request screen ID %d does not match active screen ID %d. Ignoring render request.",
-                    displayRequest.screenId, screenId
-                );
-                continue;
-            }
-
-            screenManager_render(&displayRequest);
+        if(xQueueReceive(displayQueue, &renderResult, portMAX_DELAY) != pdPASS) {
+            ESP_LOGW(TAG, "Failed to receive display request from queue");
+            continue;
         }
+        
+        const AppState *state = appDispatcher_getAppState();
+        const ScreenGeneration screenGeneration = state->sharedState.navigationState.screenGeneration;
+
+        if (renderResult.screenGeneration != screenGeneration) {
+           ESP_LOGE(TAG,
+                "BUG: stale render request generation %u received while active generation is %u",
+                (unsigned)renderResult.screenGeneration,
+                (unsigned)screenGeneration
+            );
+            continue;
+        }
+
+        screenManager_render(&renderResult);
     }
 }
 

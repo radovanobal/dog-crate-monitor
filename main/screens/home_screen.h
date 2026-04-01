@@ -7,11 +7,6 @@
 #include "../app_store.h"
 #include "../screen_manager.h"
 
-enum display_error {
-    DISPLAY_SUCCESS = 0,
-    DISPLAY_WARNING = 1,
-    DISPLAY_FAIL = -1
-};
 
 const ScreenInterface *homeScreen_getScreenInterface(void);
 

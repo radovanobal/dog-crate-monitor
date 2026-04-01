@@ -6,6 +6,7 @@
 #include "./app_event.h"
 #include "./app_store.h"
 #include "./display_types.h"
+#include "./display_controller.h"
 #include "./screen_types.h"
 
 typedef enum {
@@ -25,16 +26,8 @@ typedef struct {
 } ScreenActionResult;
 
 typedef struct {
-    bool isRenderRequired;
-    DisplayState displayState;
-} ScreenRenderResult;
-
-typedef struct {
-    enum display_error (*init)(void);
+    void (*init)(void);
     void (*deinit)(void);
-    void (*fullRenderToDisplay)(DisplayState *displayState);
-    void (*partialRenderToDisplay)(DisplayState *displayState);
-    void (*setLastEnqueuedDisplayState)(const DisplayState *displayState);
     ScreenActionResult (*handleEvent)(const AppEvent *event, const AppState *appState);
     ScreenRenderResult (*evaluateDisplay)(const AppState *appState);
 } ScreenInterface;
@@ -47,8 +40,7 @@ typedef struct {
 
 ScreenActionResult screenManager_handleEvent(const AppEvent *event, const AppState *appState);
 ScreenRenderResult screenManager_evaluateDisplay(const AppState *appState);
-DisplayRequest screenManager_buildDisplayRequest(ScreenId screenId, const DisplayState *currentDisplayState);
+DisplayRequest screenManager_buildDisplayRequest(ScreenId screenId, ScreenGeneration screenGeneration, const ScreenRenderResult *renderResult);
 void screenManager_render(DisplayRequest *displayRequest);
-void screenManager_setLastEnqueuedDisplayState(const DisplayRequest *displayRequest);
 
 #endif //DOG_CRATE_MONITOR_SCREEN_MANAGER_H

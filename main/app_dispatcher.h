@@ -7,7 +7,7 @@
 #include "./button_event.h"
 #include "./screen_manager.h"
 
-void initAppDispatcher();
+void appDispatcher_init();
 void appDispatcher_dispatchEvent(const AppEvent *event);
 void appDispatcher_applyScreenIntent(const ScreenIntent *intent);
 void appDispatcher_handleEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, TimeDate currentTime);

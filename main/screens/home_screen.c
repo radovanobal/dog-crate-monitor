@@ -1,6 +1,5 @@
 #include "esp_log.h"
 #include "epaper_port.h"
-#include "epaper_bsp.h"
 
 #include "../environment_types.h"
 #include "../display_types.h"
@@ -8,6 +7,20 @@
 #include "../app_event.h"
 #include "../app_store.h"
 #include "../screen_manager.h"
+
+
+typedef enum {
+    REGION_ALIGNMENT_CENTER = 0,
+    REGION_ALIGNMENT_TOP_CENTER = 1,
+    REGION_ALIGNMENT_TOP_RIGHT = 2
+} RegionAlignment;
+
+static int cellWidth;
+static int cellHeight;
+
+static TimeDate lastTime = {0};
+static float lastTemperatureC = 0.0f;
+static float lastHumidity = 0.0f;
 
 
 // Define the grid dimensions
@@ -25,46 +38,30 @@ static DisplayRegionDescriptor displayRegions[] = {
     [DISPLAY_REGION_ALERT] = { .id = DISPLAY_REGION_ALERT }
 };
 
-static int cellWidth;
-static int cellHeight;
-
-// Define the data cache area of the e-ink screen
-uint8_t *ImageMonoBuffer;
-
 // Log tag
-static const char *TAG = "display";
+static const char *TAG = "home_screen";
 
-static enum display_error initDisplay(void);
-static void renderToDisplay(DisplayState *displayState);
-static void partialRenderToDisplay(DisplayState *displayState);
-static ScreenActionResult handleEvent(const AppEvent *event, const AppState *appState);
-static ScreenRenderResult evaluateDisplay(const AppState *appState);
-static bool isDisplayStateChanged(const DisplayState *left, const DisplayState *right);
-static bool isClockStateChanged(const DisplayState *left, const DisplayState *right);
-static bool isTemperatureStateChanged(const DisplayState *left, const DisplayState *right);
-static bool isHumidityStateChanged(const DisplayState *left, const DisplayState *right);
+static void initDisplay(void);
 static void initRenderGrid(void);
 static void initRenderRegions(void);
-static void renderRegionToDisplay(struct GridRegion region, struct PixelCoordinates2D textPosition, const char displayText[16], sFONT *font);
-static struct PixelCoordinates2D pixelRegionCenter(struct PixelRegion pixelRegion, struct PixelSize2D itemSize);
-static struct PixelCoordinates2D pixelRegionTopCenter(struct PixelRegion pixelRegion, struct PixelSize2D itemSize);
-static struct PixelCoordinates2D pixelRegionTopRight(struct PixelRegion pixelRegion, struct PixelSize2D itemSize);
-static struct PixelRegion regionToPixelSpace(struct GridRegion gridRegion);
-static void updateMonoImageBuffer(struct PixelRegion pixelRegion, uint8_t *ImagePartialMono, uint8_t *ImageMonoBuffer);
-static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate stateCurrentTime);
-static void setLastEnqueuedDisplayState(const DisplayState *displayState);
 static void deinitDisplay(void);
-
-static DisplayState lastPaintedDisplayState = {0};
-static DisplayState lastEnqueuedDisplayState = {0};
+static ScreenActionResult handleEvent(const AppEvent *event, const AppState *appState);
+static ScreenRenderResult evaluateDisplay(const AppState *appState);
+static PixelRegion regionToPixelSpace(struct GridRegion gridRegion);
+static PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, PixelRegion pixelRegion, char text[16], sFONT *font);
+static struct PixelCoordinates2D pixelRegionCenter(PixelRegion pixelRegion, struct PixelSize2D itemSize);
+static struct PixelCoordinates2D pixelRegionTopCenter(PixelRegion pixelRegion, struct PixelSize2D itemSize);
+static struct PixelCoordinates2D pixelRegionTopRight(PixelRegion pixelRegion, struct PixelSize2D itemSize);
+static struct PixelCoordinates2D buildPixelCoordinates(DisplayRegionId regionId, const char displayText[16], const sFONT *font, RegionAlignment alignment);
+static char* buildClockText(TimeDate currentTime, char *buffer, size_t bufferSize);
+static char* buildTemperatureText(float temperatureC, char *buffer, size_t bufferSize);
+static char* buildHumidityText(float humidity, char *buffer, size_t bufferSize);
+static bool isTimeDateEqual(TimeDate t1, TimeDate t2);
 
 const ScreenInterface *homeScreen_getScreenInterface(void) {
     static const ScreenInterface screenInterface = {
         .init = initDisplay,
-        .fullRenderToDisplay = renderToDisplay,
-        .partialRenderToDisplay = partialRenderToDisplay,
         .handleEvent = handleEvent,
-        .setLastEnqueuedDisplayState = setLastEnqueuedDisplayState,
         .evaluateDisplay = evaluateDisplay,
         .deinit = deinitDisplay,
     };
@@ -72,95 +69,11 @@ const ScreenInterface *homeScreen_getScreenInterface(void) {
     return &screenInterface;
 }
 
-static enum display_error initDisplay(void)
+static void initDisplay(void)
 {
-    if((ImageMonoBuffer = (UBYTE *)malloc(EPD_SIZE_MONO)) == NULL)
-    {
-        ESP_LOGE(TAG,"Failed to apply for black memory...");
-        return DISPLAY_FAIL;
-    }
-
+    ESP_LOGI(TAG, "Initializing display and render regions");
     initRenderGrid();
     initRenderRegions();
-
-    return DISPLAY_SUCCESS;
-}
-
-static void partialRenderToDisplay(DisplayState *displayState)
-{
-    ESP_LOGI(TAG,"4.e-Paper Partial Draw 0...");
-
-    if (!isDisplayStateChanged(&lastPaintedDisplayState, displayState)) {
-        ESP_LOGI(TAG,"Display state has not changed, skipping render.");
-        return;
-    }
-
-    if (isClockStateChanged(&lastPaintedDisplayState, displayState)) {
-        const struct GridRegion clockRegion = displayRegions[DISPLAY_REGION_CLOCK].gridRegion;
-        const struct PixelRegion pixelRegion = displayRegions[DISPLAY_REGION_CLOCK].pixelRegion;
-        const struct PixelSize2D textBoxSize = (struct PixelSize2D){ .width = strlen(displayState->clockText) * Font18.Width, .height = Font18.Height };
-        struct PixelCoordinates2D clockTextPosition = { .x = pixelRegion.width - textBoxSize.width, .y = 0 };
-        renderRegionToDisplay(clockRegion, clockTextPosition, displayState->clockText, &Font18);
-    }
-
-    if (isTemperatureStateChanged(&lastPaintedDisplayState, displayState)) {
-        const struct GridRegion temperatureRegion = displayRegions[DISPLAY_REGION_TEMPERATURE].gridRegion;
-        const struct PixelRegion pixelTemperatureRegion = displayRegions[DISPLAY_REGION_TEMPERATURE].pixelRegion;
-        const struct PixelSize2D textBoxSize = (struct PixelSize2D){ .width = strlen(displayState->temperatureText) * Font48.Width, .height = Font48.Height };
-        struct PixelCoordinates2D temperatureTextPosition = { .x = (pixelTemperatureRegion.width - textBoxSize.width) / 2, .y = (pixelTemperatureRegion.height - textBoxSize.height) / 2 };
-        renderRegionToDisplay(temperatureRegion, temperatureTextPosition, displayState->temperatureText, &Font48);
-    }
-
-    if(isHumidityStateChanged(&lastPaintedDisplayState, displayState)) {
-        const struct GridRegion humidityRegion = displayRegions[DISPLAY_REGION_HUMIDITY].gridRegion;
-        const struct PixelRegion pixelHumidityRegion = displayRegions[DISPLAY_REGION_HUMIDITY].pixelRegion;
-        const struct PixelSize2D humidityTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->humidityText) * Font16.Width, .height = Font16.Height };
-        struct PixelCoordinates2D humidityTextPosition = { .x = (pixelHumidityRegion.width - humidityTextBoxSize.width) / 2, .y = 0 };
-        renderRegionToDisplay(humidityRegion, humidityTextPosition, displayState->humidityText, &Font16);
-    }
-    
-    lastPaintedDisplayState = *displayState;
-}
-
-static void renderToDisplay(DisplayState *displayState)
-{
-    ESP_LOGI(TAG,"3.e-Paper Draw 0...");
-
-    if (!isDisplayStateChanged(&lastPaintedDisplayState, displayState)) {
-        ESP_LOGI(TAG,"Display state has not changed, skipping render.");
-        return;
-    }
-
-    const struct GridRegion clockRegion = displayRegions[DISPLAY_REGION_CLOCK].gridRegion;
-    const struct GridRegion temperatureRegion = displayRegions[DISPLAY_REGION_TEMPERATURE].gridRegion;
-    const struct GridRegion humidityRegion = displayRegions[DISPLAY_REGION_HUMIDITY].gridRegion;
-
-    const struct PixelRegion clockPixelRegion = regionToPixelSpace(clockRegion);
-    const struct PixelSize2D clockTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->clockText) * Font18.Width, .height = Font18.Height };
-    const struct PixelCoordinates2D clockPixelCoordinates = pixelRegionTopRight(clockPixelRegion, clockTextBoxSize);
-
-    const struct PixelRegion temperaturePixelRegion = regionToPixelSpace(temperatureRegion);
-    const struct PixelSize2D temperatureTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->temperatureText) * Font48.Width, .height = Font48.Height };
-    const struct PixelCoordinates2D temperaturePixelCoordinates = pixelRegionCenter(temperaturePixelRegion, temperatureTextBoxSize);
-
-    const struct PixelRegion humidityPixelRegion = regionToPixelSpace(humidityRegion);
-    const struct PixelSize2D humidityTextBoxSize = (struct PixelSize2D){ .width = strlen(displayState->humidityText) * Font16.Width, .height = Font16.Height };
-    const struct PixelCoordinates2D humidityPixelCoordinates = pixelRegionTopCenter(humidityPixelRegion, humidityTextBoxSize);
-
-    Paint_NewImage(ImageMonoBuffer, gridConfig.width, gridConfig.height, ROTATE_0, WHITE);
-    Paint_SelectImage(ImageMonoBuffer);
-    Paint_Clear(WHITE);
-    Paint_DrawString_EN(clockPixelCoordinates.x, clockPixelCoordinates.y, displayState->clockText, &Font18, WHITE, BLACK);
-    Paint_DrawString_EN(temperaturePixelCoordinates.x, temperaturePixelCoordinates.y, displayState->temperatureText, &Font48, WHITE, BLACK);
-    Paint_DrawString_EN(humidityPixelCoordinates.x, humidityPixelCoordinates.y, displayState->humidityText, &Font16, WHITE, BLACK);
-
-    EPD_Display_Base(ImageMonoBuffer);
-
-    lastPaintedDisplayState = *displayState;
-}
-
-static void setLastEnqueuedDisplayState(const DisplayState *displayState) {
-    lastEnqueuedDisplayState = *displayState;
 }
 
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *appState) {
@@ -174,115 +87,116 @@ static ScreenActionResult handleEvent(const AppEvent *event, const AppState *app
 }
 
 static ScreenRenderResult evaluateDisplay(const AppState *appState) {
-    ScreenRenderResult result = { .isRenderRequired = false };
+    ScreenRenderResult result = {0};
+    DisplayRenderPlan displayRenderPlan = {0};
 
-    DisplayState newDisplayState = readyDisplayState(
-        appState->sharedState.environmentState.temperatureC, 
-        appState->sharedState.environmentState.relativeHumidity, 
-        appState->sharedState.environmentState.currentTime
-    );
+    int renderItemIndex = 0;
 
-    if (isDisplayStateChanged(&lastEnqueuedDisplayState, &newDisplayState)) {
-        result.isRenderRequired = true;
-        result.displayState = newDisplayState;
+    if(!isTimeDateEqual(lastTime, appState->sharedState.environmentState.currentTime)) {
+        char clockText[16];
+        buildClockText(appState->sharedState.environmentState.currentTime, clockText, sizeof(clockText));
+        struct PixelCoordinates2D clockTextPosition = buildPixelCoordinates(DISPLAY_REGION_CLOCK, clockText, &Font18, REGION_ALIGNMENT_TOP_RIGHT);
+        displayRenderPlan.items[renderItemIndex++] = createTextRenderItem(clockTextPosition, displayRegions[DISPLAY_REGION_CLOCK].pixelRegion, clockText, &Font18);
     }
+
+    if(lastTemperatureC != appState->sharedState.environmentState.temperatureC) {
+        char temperatureText[16];
+        buildTemperatureText(appState->sharedState.environmentState.temperatureC, temperatureText, sizeof(temperatureText));
+        struct PixelCoordinates2D temperatureTextPosition = buildPixelCoordinates(DISPLAY_REGION_TEMPERATURE, temperatureText, &Font48, REGION_ALIGNMENT_CENTER);
+        displayRenderPlan.items[renderItemIndex++] = createTextRenderItem(temperatureTextPosition, displayRegions[DISPLAY_REGION_TEMPERATURE].pixelRegion, temperatureText, &Font48);
+    }
+
+    if(lastHumidity != appState->sharedState.environmentState.relativeHumidity) {
+        char humidityText[16];
+        buildHumidityText(appState->sharedState.environmentState.relativeHumidity, humidityText, sizeof(humidityText));
+        struct PixelCoordinates2D humidityTextPosition = buildPixelCoordinates(DISPLAY_REGION_HUMIDITY, humidityText, &Font16, REGION_ALIGNMENT_TOP_CENTER);
+        displayRenderPlan.items[renderItemIndex++] = createTextRenderItem(humidityTextPosition, displayRegions[DISPLAY_REGION_HUMIDITY].pixelRegion, humidityText, &Font16);    
+    }
+
+    displayRenderPlan.count = renderItemIndex;
+    result.displayRenderPlan = displayRenderPlan;
+
+
+    lastTime = appState->sharedState.environmentState.currentTime;
+    lastTemperatureC = appState->sharedState.environmentState.temperatureC;
+    lastHumidity = appState->sharedState.environmentState.relativeHumidity;
 
     return result;
 }
 
-static enum display_error initRegionMonoImage(struct GridRegion gridRegion, uint8_t **monoRegionImage) {
-    const struct PixelRegion pixelRegion = regionToPixelSpace(gridRegion);
-    const int regionImageSize = ((pixelRegion.width + 7) / 8) * pixelRegion.height; // Calculate the size in bytes for a monochrome image
+static bool isTimeDateEqual(TimeDate t1, TimeDate t2) {
+    return t1.years == t2.years &&
+           t1.months == t2.months &&
+           t1.days == t2.days &&
+           t1.hours == t2.hours &&
+           t1.minutes == t2.minutes &&
+           t1.seconds == t2.seconds &&
+           t1.week == t2.week;
+}
 
-    *monoRegionImage = (UBYTE *)malloc(regionImageSize);
-    if(*monoRegionImage == NULL) {
-        ESP_LOGE(TAG,"Failed to apply for black memory...");
-        return DISPLAY_FAIL;
+static char* buildClockText(TimeDate currentTime, char *buffer, size_t bufferSize) {
+    snprintf(buffer, bufferSize, "%02d:%02d", currentTime.hours, currentTime.minutes);
+    return buffer;
+}
+
+static char* buildTemperatureText(float temperatureC, char *buffer, size_t bufferSize) {
+    snprintf(buffer, bufferSize, "%.1fC", temperatureC);
+    return buffer;
+}
+
+static char* buildHumidityText(float humidity, char *buffer, size_t bufferSize) {
+    snprintf(buffer, bufferSize, "%.1f%%", humidity);
+    return buffer;
+}
+
+static struct PixelCoordinates2D buildPixelCoordinates(DisplayRegionId regionId, const char displayText[16], const sFONT *font, RegionAlignment alignment) {
+    const PixelRegion pixelRegion = displayRegions[regionId].pixelRegion;
+    const struct PixelSize2D textBoxSize = (struct PixelSize2D){ .width = strlen(displayText) * font->Width, .height = font->Height };
+    struct PixelCoordinates2D textPosition;
+
+    switch (alignment) {
+        case REGION_ALIGNMENT_CENTER:
+            textPosition = pixelRegionCenter(pixelRegion, textBoxSize);
+            break;
+        case REGION_ALIGNMENT_TOP_CENTER:
+            textPosition = pixelRegionTopCenter(pixelRegion, textBoxSize);
+            break;
+        case REGION_ALIGNMENT_TOP_RIGHT:
+            textPosition = pixelRegionTopRight(pixelRegion, textBoxSize);
+            break;
+        default:
+            textPosition = pixelRegionCenter(pixelRegion, textBoxSize);
+            break;
     }
 
-    return DISPLAY_SUCCESS;
+    return textPosition;
 }
 
-static bool isClockStateChanged(const DisplayState *left, const DisplayState *right) {
-    return strcmp(left->clockText, right->clockText) != 0;
-}
+static PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, PixelRegion pixelRegion, char text[16], sFONT *font) {
+    PixelRenderItem renderItem = (PixelRenderItem){
+        .type = RENDER_ITEM_TYPE_TEXT,
+        .pixelRegion = pixelRegion,
+        .data = {
+            .text = {
+                .position = position,
+                .font = font,
+            }
+        }
+    };
 
-static bool isTemperatureStateChanged(const DisplayState *left, const DisplayState *right) {
-    return strcmp(left->temperatureText, right->temperatureText) != 0;
-}
+    strncpy(renderItem.data.text.text, text, sizeof(renderItem.data.text.text) - 1);
 
-static bool isHumidityStateChanged(const DisplayState *left, const DisplayState *right) {
-    return strcmp(left->humidityText, right->humidityText) != 0;
-}
-
-static bool isSensorStateChanged(const DisplayState *left, const DisplayState *right) {
-    return isTemperatureStateChanged(left, right) || isHumidityStateChanged(left, right);
-}
-
-static bool isDisplayStateChanged(const DisplayState *left, const DisplayState *right) {
-    return isTemperatureStateChanged(left, right) 
-    || isHumidityStateChanged(left, right) 
-    || isClockStateChanged(left, right)
-    ;
-}
-
-static void renderRegionToDisplay(struct GridRegion displayRegion, struct PixelCoordinates2D textPosition, const char displayText[16], sFONT *font) {
-        const struct PixelRegion pixelRegion = regionToPixelSpace(displayRegion);
-        uint8_t *ImagePartialMono;
-
-        initRegionMonoImage(displayRegion, &ImagePartialMono);
-
-        Paint_NewImage(ImagePartialMono, pixelRegion.width, pixelRegion.height, ROTATE_0, WHITE);
-        Paint_SelectImage(ImagePartialMono);
-        Paint_Clear(WHITE);
-        Paint_DrawString_EN(textPosition.x, textPosition.y, displayText, font, WHITE, BLACK);
-        
-        ESP_LOGI(TAG,
-            "Partial rendering region x:%d y:%d width:%d height:%d; text: %s", 
-            pixelRegion.x, pixelRegion.y, pixelRegion.width, pixelRegion.height, displayText
-        );
-
-        updateMonoImageBuffer(pixelRegion, ImagePartialMono, ImageMonoBuffer);
-
-
-        /*
-
-        When the driver supports partial update, use the code below to update the corresponding region of the screen. 
-        Otherwise, use full screen partial update. The driver first needs to be able to update the region and snyc the
-        buffer with the region image, then partial update can be used to update the region on screen.
-
-        EPD_Display_Partial(
-            ImagePartialMono,
-            pixelRegion.x,
-            gridConfig.height - (pixelRegion.y + pixelRegion.height),
-            pixelRegion.x + pixelRegion.width,
-            gridConfig.height - pixelRegion.y
-        );    
-        */
-
-        EPD_Display_Partial(
-            ImageMonoBuffer,
-            0,
-            0,
-            EPD_WIDTH,
-            EPD_HEIGHT
-        );
-
-        free(ImagePartialMono);
+    return renderItem;
 }
 
 static void initRenderGrid(void)
 {
-    // Initialize the rendering grid or any necessary data structures here
     cellWidth = gridConfig.width / gridConfig.columns;
     cellHeight = gridConfig.height / gridConfig.rows;    
 }
 
 static void initRenderRegions(void)
 {
-    // Initialize the rendering regions based on the grid configuration
-    // You can create an array of GridRegion structures to define specific areas for rendering
-
     displayRegions[DISPLAY_REGION_CLOCK].gridRegion = (struct GridRegion){ .x = 4, .y = 0, .width = 1, .height = 1 };
     displayRegions[DISPLAY_REGION_TEMPERATURE].gridRegion = (struct GridRegion){ .x = 1, .y = 1, .width = 3, .height = 2 };
     displayRegions[DISPLAY_REGION_HUMIDITY].gridRegion = (struct GridRegion){ .x = 1, .y = 3, .width = 3, .height = 1 };
@@ -295,75 +209,40 @@ static void initRenderRegions(void)
     }
 }
 
-static struct PixelCoordinates2D pixelRegionCenter(struct PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
+static struct PixelCoordinates2D pixelRegionCenter(PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
     const UWORD x = pixelRegion.x + (pixelRegion.width - pixelItemSize.width) / 2;
     const UWORD y = pixelRegion.y + (pixelRegion.height - pixelItemSize.height) / 2;
 
     return (struct PixelCoordinates2D){ .x = x, .y = y };
 }
 
-static struct PixelCoordinates2D pixelRegionTopCenter(struct PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
+static struct PixelCoordinates2D pixelRegionTopCenter(PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
     const UWORD x = pixelRegion.x + (pixelRegion.width - pixelItemSize.width) / 2;
     const UWORD y = pixelRegion.y;
 
     return (struct PixelCoordinates2D){ .x = x, .y = y };
 }
 
-static struct PixelCoordinates2D pixelRegionTopRight(struct PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
+static struct PixelCoordinates2D pixelRegionTopRight(PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
     const UWORD x = pixelRegion.x + pixelRegion.width - pixelItemSize.width;
     const UWORD y = pixelRegion.y;
 
     return (struct PixelCoordinates2D){ .x = x, .y = y };
 }
 
-static struct PixelRegion regionToPixelSpace(struct GridRegion gridRegion) {
+static PixelRegion regionToPixelSpace(struct GridRegion gridRegion) {
     const int pixelX = gridRegion.x * cellWidth;
     const int pixelY = gridRegion.y * cellHeight;
     const int pixelWidth = gridRegion.width * cellWidth;
     const int pixelHeight = gridRegion.height * cellHeight;
 
-    return (struct PixelRegion){ .x = pixelX, .y = pixelY, .width = pixelWidth, .height = pixelHeight };
-}
-
-static void updateMonoImageBuffer(struct PixelRegion pixelRegion, uint8_t *ImagePartialMono, uint8_t *ImageMonoBuffer) {
-    const int fullStride = (gridConfig.width + 7) / 8;
-    const int regionStride = (pixelRegion.width + 7) / 8;
-    const int xByteOffset = pixelRegion.x / 8;
-
-    for (int row = 0; row < pixelRegion.height; row++) {
-        memcpy(
-            ImageMonoBuffer + ((pixelRegion.y + row) * fullStride) + xByteOffset,
-            ImagePartialMono + (row * regionStride),
-            regionStride
-        );
-    }
-}
-
-static DisplayState readyDisplayState(float stateTemperatureC, float stateRelativeHumidity, TimeDate stateCurrentTime) {
-    DisplayState displayState = {0};
-    snprintf(displayState.temperatureText, sizeof(displayState.temperatureText), "%.1fC", stateTemperatureC);
-    snprintf(displayState.humidityText, sizeof(displayState.humidityText), "%.1f%%", stateRelativeHumidity);
-
-    if (stateCurrentTime.hours > 23 || stateCurrentTime.minutes > 59) {
-        snprintf(displayState.clockText, sizeof(displayState.clockText), "--:--");
-    } else {
-        snprintf(displayState.clockText, sizeof(displayState.clockText), "%02u:%02u", (unsigned)stateCurrentTime.hours, (unsigned)stateCurrentTime.minutes);
-    }
-
-    displayState.showEnvironmentWarning = false;
-    displayState.showBluetooth = false;
-    displayState.showWifi = false;
-    displayState.showBattery = false;
-
-    return displayState;
+    return (PixelRegion){ .x = pixelX, .y = pixelY, .width = pixelWidth, .height = pixelHeight };
 }
 
 static void deinitDisplay(void) {
-    if (ImageMonoBuffer != NULL) {
-        free(ImageMonoBuffer);
-        ImageMonoBuffer = NULL;
-    }
+    lastHumidity = 0.0f;
+    lastTemperatureC = 0.0f;
+    lastTime = (TimeDate){0};
 
-    lastPaintedDisplayState = (DisplayState){0};
-    lastEnqueuedDisplayState = (DisplayState){0};
+    ESP_LOGI(TAG, "Display deinitialized and state reset");
 }

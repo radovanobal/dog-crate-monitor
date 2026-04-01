@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "./screen_types.h"
+
+#include "GUI_Paint.h"
+
+#define MAX_RENDER_ITEMS 12
 
 struct GridConfig {
     int width;
@@ -19,12 +22,12 @@ struct GridRegion {
     int height;
 };
 
-struct PixelRegion {
+typedef struct {
     int x;
     int y;
     int width;
     int height;
-};
+} PixelRegion;
 
 struct PixelSize2D {
     int width;
@@ -56,19 +59,62 @@ typedef enum {
 typedef struct {
     DisplayRegionId id;
     struct GridRegion gridRegion;
-    struct PixelRegion pixelRegion;
+    PixelRegion pixelRegion;
 }DisplayRegionDescriptor;
 
 typedef enum {
-    DISPLAY_PAINT_TYPE_FULL,
-    DISPLAY_PAINT_TYPE_PARTIAL
+    DISPLAY_PAINT_TYPE_NONE = 0,
+    DISPLAY_PAINT_TYPE_FULL = 1,
+    DISPLAY_PAINT_TYPE_PARTIAL = 2
 } DisplayPaintType;
 
+typedef enum {
+    RENDER_ITEM_TYPE_TEXT = 0,
+    RENDER_ITEM_TYPE_BITMAP,
+    RENDER_ITEM_TYPE_RECT,
+    RENDER_ITEM_TYPE_LINE
+} RenderItemType;
+
 typedef struct {
-    ScreenId screenId;
-    DisplayPaintType paintType;
-//    DisplayRegionId regionId;
-    DisplayState displayState;
-} DisplayRequest;
+    RenderItemType type;
+    PixelRegion pixelRegion;
+    union {
+        struct {
+            struct PixelCoordinates2D position;
+            char text[32];
+            sFONT *font;
+        } text;
+        struct {
+            struct PixelCoordinates2D position;
+            const unsigned char *imageData;
+            struct PixelSize2D size;
+        } bitmap;
+        struct {
+            struct PixelCoordinates2D position;
+            struct PixelSize2D size;
+            uint16_t color;
+            DOT_PIXEL thickness;
+            DRAW_FILL fillType;
+        } rect;
+        struct {
+            struct PixelCoordinates2D start;
+            struct PixelCoordinates2D end;
+            uint16_t color;
+            DOT_PIXEL thickness;
+            LINE_STYLE style;
+        } line;
+    } data;
+} PixelRenderItem;
+
+typedef struct {
+    PixelRenderItem items[MAX_RENDER_ITEMS];
+    size_t count;
+} DisplayRenderPlan;
+
+typedef enum {
+    DISPLAY_SUCCESS = 0,
+    DISPLAY_WARNING = 1,
+    DISPLAY_FAIL = -1
+} display_init_error;
 
 #endif // DOG_CRATE_MONITOR_DISPLAY_TYPES_H

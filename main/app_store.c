@@ -1,3 +1,4 @@
+#include "esp_log.h"
 
 #include "./app_store.h"
 #include "./environment_types.h"
@@ -5,6 +6,8 @@
 
 static void initEnvironment(AppState *appState);
 static void initScreenState(AppState *appState);
+
+static const char *TAG = "app_store";
 
 void appStore_initAppState(AppState *appState) {
     initEnvironment(appState);
@@ -19,6 +22,7 @@ static void initEnvironment(AppState *appState) {
 
 static void initScreenState(AppState *appState) {
     appState->sharedState.navigationState.activeScreen = SCREEN_ID_HOME;
+    appState->sharedState.navigationState.screenGeneration = 1;
 }
 
 void appStore_updateEnvironmentState(AppState *appState, float temperatureC, float relativeHumidity, TimeDate currentTime) {
@@ -28,6 +32,12 @@ void appStore_updateEnvironmentState(AppState *appState, float temperatureC, flo
 }
 
 void appStore_updateNavigationState(AppState *appState, ScreenId activeScreen) {
+    if (appState->sharedState.navigationState.activeScreen == activeScreen) {
+        ESP_LOGW(TAG, "Attempted to update navigation state to the same active screen ID %d. No update performed.", activeScreen);
+        return;
+    }
+
     appState->sharedState.navigationState.activeScreen = activeScreen;
+    appState->sharedState.navigationState.screenGeneration++;
 }
 
