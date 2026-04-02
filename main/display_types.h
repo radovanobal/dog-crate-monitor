@@ -47,20 +47,20 @@ typedef struct {
     bool showBluetooth;
     bool showWifi;
     bool showBattery;
-}DisplayState;
+} DisplayState;
 
 typedef enum {
     DISPLAY_REGION_CLOCK = 0,
     DISPLAY_REGION_TEMPERATURE = 1,
     DISPLAY_REGION_HUMIDITY = 2,
     DISPLAY_REGION_ALERT = 3,
-}DisplayRegionId;
+} DisplayRegionId;
 
 typedef struct {
     DisplayRegionId id;
     struct GridRegion gridRegion;
     PixelRegion pixelRegion;
-}DisplayRegionDescriptor;
+} DisplayRegionDescriptor;
 
 typedef enum {
     DISPLAY_PAINT_TYPE_NONE = 0,

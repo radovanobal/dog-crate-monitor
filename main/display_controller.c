@@ -14,15 +14,18 @@ static void partialRenderToDisplay(const DisplayRenderPlan *displayRenderPlan);
 static void paintItems(const DisplayRenderPlan *displayRenderPlan);
 static void paintPartialItems(const DisplayRenderPlan *displayRenderPlan);
 static void paintItem(const PixelRenderItem *item);
-static DisplayPaintType determinePaintType(ScreenGeneration screenGeneration, size_t displayRenderPlanItemCount);
+static bool DisplayRenderPlanEquals(const DisplayRenderPlan *plan1, const DisplayRenderPlan *plan2);
+static bool pixelRenderItemEquals(const PixelRenderItem *item1, const PixelRenderItem *item2);
+static bool pixelRegionEquals(const PixelRegion *left, const PixelRegion *right);
+static DisplayPaintType determinePaintType(ScreenGeneration screenGeneration, DisplayRenderPlan displayRenderPlan);
 
 static const char *TAG = "display_controller";
 
+static DisplayRenderPlan lastRenderPlan = {0};
 static uint8_t *ImageMonoBuffer;
 static const int maxPartialRenderCount = 100;
 static int partialRenderCount = maxPartialRenderCount;
 static ScreenGeneration lastRenderedScreenGeneration = 0;
-
 
 display_init_error displayController_init(void) {
     initEpaperDisplay();
@@ -44,7 +47,7 @@ void displayController_deinit(void) {
 }
 
 void displayController_requestRender(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration) {
-    DisplayPaintType paintType = determinePaintType(screenGeneration, displayRenderPlan->count);
+    DisplayPaintType paintType = determinePaintType(screenGeneration, *displayRenderPlan);
 
     switch (paintType) {
         case DISPLAY_PAINT_TYPE_FULL:
@@ -62,12 +65,18 @@ void displayController_requestRender(const DisplayRenderPlan *displayRenderPlan,
             ESP_LOGW(TAG, "Unknown paint type: %d", paintType);
     }
 
+    lastRenderPlan = *displayRenderPlan;
     lastRenderedScreenGeneration = screenGeneration;
 }
 
-static DisplayPaintType determinePaintType(ScreenGeneration screenGeneration, size_t displayRenderPlanItemCount) {
-    if (displayRenderPlanItemCount == 0) {
+static DisplayPaintType determinePaintType(ScreenGeneration screenGeneration, DisplayRenderPlan displayRenderPlan) {
+    if (displayRenderPlan.count == 0) {
         ESP_LOGW(TAG, "No items to render in the display render plan");
+        return DISPLAY_PAINT_TYPE_NONE;
+    }
+
+    if (DisplayRenderPlanEquals(&displayRenderPlan, &lastRenderPlan)) {
+        ESP_LOGI(TAG, "Display render plan unchanged. No render required.");
         return DISPLAY_PAINT_TYPE_NONE;
     }
 
@@ -85,6 +94,76 @@ static DisplayPaintType determinePaintType(ScreenGeneration screenGeneration, si
     } 
 
     return DISPLAY_PAINT_TYPE_PARTIAL;
+}
+
+static bool DisplayRenderPlanEquals(const DisplayRenderPlan *plan1, const DisplayRenderPlan *plan2) {
+    if (plan1->count != plan2->count) {
+        return false;
+    }
+
+    for (size_t i = 0; i < plan1->count; i++) {
+        const PixelRenderItem *item1 = &plan1->items[i];
+        const PixelRenderItem *item2 = &plan2->items[i];
+
+        if (!pixelRenderItemEquals(item1, item2)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool pixelRegionEquals(const PixelRegion *left, const PixelRegion *right) {
+    return left->x == right->x &&
+           left->y == right->y &&
+           left->width == right->width &&
+           left->height == right->height;
+}
+
+
+static bool pixelRenderItemEquals(const PixelRenderItem *left, const PixelRenderItem *right) {
+    if (left->type != right->type) {
+        return false;
+    }
+
+    if (!pixelRegionEquals(&left->pixelRegion, &right->pixelRegion)) {
+        return false;
+    }
+
+    switch (left->type) {
+        case RENDER_ITEM_TYPE_TEXT:
+            return left->data.text.position.x == right->data.text.position.x &&
+                   left->data.text.position.y == right->data.text.position.y &&
+                   left->data.text.font == right->data.text.font &&
+                   strcmp(left->data.text.text, right->data.text.text) == 0;
+
+        case RENDER_ITEM_TYPE_BITMAP:
+            return left->data.bitmap.position.x == right->data.bitmap.position.x &&
+                   left->data.bitmap.position.y == right->data.bitmap.position.y &&
+                   left->data.bitmap.imageData == right->data.bitmap.imageData &&
+                   left->data.bitmap.size.width == right->data.bitmap.size.width &&
+                   left->data.bitmap.size.height == right->data.bitmap.size.height;
+
+        case RENDER_ITEM_TYPE_RECT:
+            return left->data.rect.position.x == right->data.rect.position.x &&
+                   left->data.rect.position.y == right->data.rect.position.y &&
+                   left->data.rect.size.width == right->data.rect.size.width &&
+                   left->data.rect.size.height == right->data.rect.size.height &&
+                   left->data.rect.color == right->data.rect.color &&
+                   left->data.rect.thickness == right->data.rect.thickness &&
+                   left->data.rect.fillType == right->data.rect.fillType;
+
+        case RENDER_ITEM_TYPE_LINE:
+            return left->data.line.start.x == right->data.line.start.x &&
+                   left->data.line.start.y == right->data.line.start.y &&
+                   left->data.line.end.x == right->data.line.end.x &&
+                   left->data.line.end.y == right->data.line.end.y &&
+                   left->data.line.color == right->data.line.color &&
+                   left->data.line.thickness == right->data.line.thickness &&
+                   left->data.line.style == right->data.line.style;
+    }
+
+    return false;
 }
 
 static void initEpaperDisplay(void) {
