@@ -23,4 +23,9 @@ typedef struct {
     DisplayRenderPlan displayRenderPlan;
 } DisplayRequest;
 
+typedef struct {
+    DisplayRegionId regionId;
+    bool isDirty;
+} DirtyRegionEntry;
+
 #endif // DOG_CRATE_MONITOR_SCREEN_TYPES_H

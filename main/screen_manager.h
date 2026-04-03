@@ -14,6 +14,12 @@ typedef enum {
     SCREEN_INTENT_SET_ACTIVE_SCREEN = 1,
 } ScreenIntentType;
 
+typedef enum {
+    SCREEN_PURPOSE_NAVIGATION = 0,
+    SCREEN_PURPOSE_SETTINGS = 1,
+    SCREEN_PURPOSE_DATA_DISPLAY = 2
+} ScreenPurpose;
+
 typedef struct {
     ScreenIntentType intentType;
     union {
@@ -26,6 +32,7 @@ typedef struct {
 } ScreenActionResult;
 
 typedef struct {
+    ScreenPurpose purpose;
     void (*init)(void);
     void (*deinit)(void);
     ScreenActionResult (*handleEvent)(const AppEvent *event, const AppState *appState);

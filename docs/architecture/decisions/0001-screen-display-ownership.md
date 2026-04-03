@@ -103,7 +103,7 @@ If the device needs mirrored output for viewing in a rear-view mirror, that beha
 ## Rules Derived From This Decision
 
 1. The first render after screen activation is always a full refresh.
-2. Screens report invalidation; the display refresh layer chooses refresh strategy.
+2. Screens prepare logical render content and report invalidation; the display refresh layer chooses the panel refresh strategy.
 3. Screen deactivation clears screen-local state only.
 4. Display sleep and wake behavior is never owned by an individual screen.
 5. Shared application state is updated before the active screen derives new render state from it.
@@ -119,7 +119,7 @@ The expected refactor direction is:
 1. Remove panel lifecycle ownership from individual screens.
 2. Introduce a display refresh module that owns buffers and refresh policy.
 3. Keep screen manager focused on lifecycle and routing.
-4. Evolve screens toward reporting dirty regions instead of returning one global display-state shape.
+4. Evolve screens toward reporting dirty regions and screen-prepared render content instead of returning one global display-state shape.
 5. Allow partial render requests from the same active-screen generation to be coalesced until a full-screen paint is queued.
 6. Never merge full-screen paint requests with other render requests.
 7. Keep power-management orchestration in a dedicated module that coordinates with the display refresh layer through a clear boundary.

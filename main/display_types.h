@@ -54,6 +54,7 @@ typedef enum {
     DISPLAY_REGION_TEMPERATURE = 1,
     DISPLAY_REGION_HUMIDITY = 2,
     DISPLAY_REGION_ALERT = 3,
+    DISPLAY_REGION_MAIN_MENU = 4
 } DisplayRegionId;
 
 typedef struct {
@@ -69,10 +70,11 @@ typedef enum {
 } DisplayPaintType;
 
 typedef enum {
-    RENDER_ITEM_TYPE_TEXT = 0,
-    RENDER_ITEM_TYPE_BITMAP,
-    RENDER_ITEM_TYPE_RECT,
-    RENDER_ITEM_TYPE_LINE
+    RENDER_ITEM_TYPE_CLEAR = 0,
+    RENDER_ITEM_TYPE_TEXT = 1,
+    RENDER_ITEM_TYPE_BITMAP = 2,
+    RENDER_ITEM_TYPE_RECT = 3,
+    RENDER_ITEM_TYPE_LINE = 4,
 } RenderItemType;
 
 typedef struct {

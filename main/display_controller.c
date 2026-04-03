@@ -131,6 +131,9 @@ static bool pixelRenderItemEquals(const PixelRenderItem *left, const PixelRender
     }
 
     switch (left->type) {
+        case RENDER_ITEM_TYPE_CLEAR:
+            return true;
+
         case RENDER_ITEM_TYPE_TEXT:
             return left->data.text.position.x == right->data.text.position.x &&
                    left->data.text.position.y == right->data.text.position.y &&
@@ -171,7 +174,6 @@ static void initEpaperDisplay(void) {
     epaper_port_init();
     EPD_Init();
     EPD_Clear();
-    vTaskDelay(pdMS_TO_TICKS(2000));
 }
 
 static void paintItems(const DisplayRenderPlan *displayRenderPlan) {
@@ -203,6 +205,17 @@ static void paintPartialItems(const DisplayRenderPlan *displayRenderPlan) {
 
 static void paintItem(const PixelRenderItem *item) {
     switch (item->type) {
+        case RENDER_ITEM_TYPE_CLEAR:
+            Paint_DrawRectangle(
+                item->pixelRegion.x,
+                item->pixelRegion.y,
+                item->pixelRegion.x + item->pixelRegion.width - 1,
+                item->pixelRegion.y + item->pixelRegion.height - 1,
+                WHITE,
+                DOT_PIXEL_1X1, 
+                DRAW_FILL_FULL
+            );
+            break;
         case RENDER_ITEM_TYPE_TEXT:
             Paint_DrawString_EN(
                 item->data.text.position.x,

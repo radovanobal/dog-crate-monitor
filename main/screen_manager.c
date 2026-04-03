@@ -6,17 +6,21 @@
 #include "./display_controller.h"
 #include "./app_event.h"
 #include "./app_store.h"
+#include "./utils/macros.h"
 #include "./screens/home_screen.h"
 #include "./screens/menu_screen.h"
 
 static void handleInputEvent(const AppEvent *event, const AppState *state, ScreenActionResult *result);
 static ScreenRegistration createScreenRegistration(ScreenId id, const ScreenInterface *interface);
 static void ensureActiveScreenRegistered(const AppState *state);
+static bool shouldUpdateLastDataScreenId(ScreenPurpose purpose);
 
 static const char *TAG = "screen_manager";
 
 static ScreenRegistration registeredScreen = {0};
 static ScreenGeneration lastScreenGeneration = 0;
+static const ScreenPurpose nonReturnablePurposes[] = { SCREEN_PURPOSE_NAVIGATION, SCREEN_PURPOSE_SETTINGS };
+static ScreenId lastDataScreenId = SCREEN_ID_HOME;
 
 void screenManager_render(DisplayRequest *displayRequest) {
     if (displayRequest->screenGeneration != lastScreenGeneration) {  
@@ -100,16 +104,32 @@ static void ensureActiveScreenRegistered(const AppState *state) {
 
     registeredScreen.interface->init();
     registeredScreen.isInitialized = true;
+
+    if(shouldUpdateLastDataScreenId(registeredScreen.interface->purpose)) {
+        lastDataScreenId = activeScreenId;
+    }
+}
+
+static bool shouldUpdateLastDataScreenId(ScreenPurpose purpose) {
+    for (size_t i = 0; i < ARRAY_SIZE(nonReturnablePurposes); i++) {
+        if (nonReturnablePurposes[i] == purpose) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static void handleInputEvent(const AppEvent *event, const AppState *state, ScreenActionResult *result) {
     if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_BUTTON_SELECT) {
         ScreenIntent intent = {
             .intentType = SCREEN_INTENT_SET_ACTIVE_SCREEN,
-            .data.screenId = (state->sharedState.navigationState.activeScreen + 1) % 2 // Example: toggle between two screens
+            .data.screenId = state->sharedState.navigationState.activeScreen == SCREEN_ID_MENU ? lastDataScreenId : SCREEN_ID_MENU
         };
         result->screenIntent = intent;
     }
+
+    
 }
 
 static ScreenRegistration createScreenRegistration(ScreenId id, const ScreenInterface *interface) {

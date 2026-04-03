@@ -3,22 +3,13 @@
 
 #include "../environment_types.h"
 #include "../display_types.h"
-#include "../screens/home_screen.h"
 #include "../app_event.h"
 #include "../app_store.h"
 #include "../screen_manager.h"
+#include "../screen_layout.h"
+#include "../utils/macros.h"
+#include "../screens/home_screen.h"
 
-
-typedef enum {
-    REGION_ALIGNMENT_CENTER = 0,
-    REGION_ALIGNMENT_TOP_CENTER = 1,
-    REGION_ALIGNMENT_TOP_RIGHT = 2
-} RegionAlignment;
-
-typedef struct {
-    DisplayRegionId regionId;
-    bool isDirty;
-} DirtyRegionEntry;
 
 typedef struct {
     struct {
@@ -33,8 +24,7 @@ typedef struct {
     } derived;
 } HomeScreenState;
 
-static int cellWidth;
-static int cellHeight;
+static ScreenLayout screenLayout;
 static HomeScreenState homeScreenState = {0};
 static HomeScreenState nextScreenState = {0};
 
@@ -64,7 +54,6 @@ static DirtyRegionEntry dirtyDisplayRegions[] = {
 static const char *TAG = "home_screen";
 
 static void initDisplay(void);
-static void initRenderGrid(void);
 static void initRenderRegions(void);
 static void deinitDisplay(void);
 static void derivedStateFromAppState(const AppState *appState);
@@ -72,12 +61,7 @@ static void determineDirtyRegions(const AppState *appState);
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState);
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *appState);
 static ScreenRenderResult evaluateDisplay(const AppState *appState);
-static PixelRegion regionToPixelSpace(struct GridRegion gridRegion);
 static PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, PixelRegion pixelRegion, char text[16], sFONT *font);
-static struct PixelCoordinates2D pixelRegionCenter(PixelRegion pixelRegion, struct PixelSize2D itemSize);
-static struct PixelCoordinates2D pixelRegionTopCenter(PixelRegion pixelRegion, struct PixelSize2D itemSize);
-static struct PixelCoordinates2D pixelRegionTopRight(PixelRegion pixelRegion, struct PixelSize2D itemSize);
-static struct PixelCoordinates2D buildPixelCoordinates(DisplayRegionId regionId, const char displayText[16], const sFONT *font, RegionAlignment alignment);
 static char* buildClockText(TimeDate currentTime, char *buffer, size_t bufferSize);
 static char* buildTemperatureText(float temperatureC, char *buffer, size_t bufferSize);
 static char* buildHumidityText(float humidity, char *buffer, size_t bufferSize);
@@ -88,6 +72,7 @@ static PixelRenderItem createHumidityRenderItem(const AppState *appState);
 
 const ScreenInterface *homeScreen_getScreenInterface(void) {
     static const ScreenInterface screenInterface = {
+        .purpose = SCREEN_PURPOSE_DATA_DISPLAY,
         .init = initDisplay,
         .handleEvent = handleEvent,
         .evaluateDisplay = evaluateDisplay,
@@ -100,7 +85,7 @@ const ScreenInterface *homeScreen_getScreenInterface(void) {
 static void initDisplay(void)
 {
     ESP_LOGI(TAG, "Initializing display and render regions");
-    initRenderGrid();
+    screenLayout = initRenderGrid(gridConfig);
     initRenderRegions();
 }
 
@@ -147,7 +132,7 @@ static void derivedStateFromAppState(const AppState *appState) {
 }
 
 static void determineDirtyRegions() {   
-    for (size_t i = 0; i < sizeof(dirtyDisplayRegions) / sizeof(dirtyDisplayRegions[0]); i++) {
+    for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
         dirtyDisplayRegions[i].isDirty = false;
     }
 
@@ -200,7 +185,7 @@ static bool isTimeDateEqual(TimeDate t1, TimeDate t2) {
 static PixelRenderItem createClockRenderItem(const AppState *appState) {        
     ESP_LOGI(TAG, "Clock text changed from '%s' to '%s'", homeScreenState.derived.clockText, nextScreenState.derived.clockText);
 
-    struct PixelCoordinates2D clockTextPosition = buildPixelCoordinates(DISPLAY_REGION_CLOCK, nextScreenState.derived.clockText, &Font18, REGION_ALIGNMENT_TOP_RIGHT);
+    struct PixelCoordinates2D clockTextPosition = calculateAlignedTextPosition(&displayRegions[DISPLAY_REGION_CLOCK], nextScreenState.derived.clockText, &Font18, REGION_ALIGNMENT_TOP_RIGHT);
     PixelRenderItem renderItem = createTextRenderItem(clockTextPosition, displayRegions[DISPLAY_REGION_CLOCK].pixelRegion, nextScreenState.derived.clockText, &Font18);
 
     return renderItem;
@@ -209,7 +194,7 @@ static PixelRenderItem createClockRenderItem(const AppState *appState) {
 static PixelRenderItem createTemperatureRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Temperature text changed from '%s' to '%s'", homeScreenState.derived.temperatureText, nextScreenState.derived.temperatureText);
 
-    struct PixelCoordinates2D temperatureTextPosition = buildPixelCoordinates(DISPLAY_REGION_TEMPERATURE, nextScreenState.derived.temperatureText, &Font48, REGION_ALIGNMENT_CENTER);
+    struct PixelCoordinates2D temperatureTextPosition = calculateAlignedTextPosition(&displayRegions[DISPLAY_REGION_TEMPERATURE], nextScreenState.derived.temperatureText, &Font48, REGION_ALIGNMENT_CENTER);
     PixelRenderItem renderItem = createTextRenderItem(temperatureTextPosition, displayRegions[DISPLAY_REGION_TEMPERATURE].pixelRegion, nextScreenState.derived.temperatureText, &Font48);
 
     return renderItem;
@@ -218,8 +203,8 @@ static PixelRenderItem createTemperatureRenderItem(const AppState *appState) {
 static PixelRenderItem createHumidityRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Humidity text changed from '%s' to '%s'", homeScreenState.derived.humidityText, nextScreenState.derived.humidityText);
 
-    struct PixelCoordinates2D humidityTextPosition = buildPixelCoordinates(DISPLAY_REGION_HUMIDITY, nextScreenState.derived.humidityText, &Font48, REGION_ALIGNMENT_CENTER);
-    PixelRenderItem renderItem = createTextRenderItem(humidityTextPosition, displayRegions[DISPLAY_REGION_HUMIDITY].pixelRegion, nextScreenState.derived.humidityText, &Font48);
+    struct PixelCoordinates2D humidityTextPosition = calculateAlignedTextPosition(&displayRegions[DISPLAY_REGION_HUMIDITY], nextScreenState.derived.humidityText, &Font16, REGION_ALIGNMENT_TOP_CENTER);
+    PixelRenderItem renderItem = createTextRenderItem(humidityTextPosition, displayRegions[DISPLAY_REGION_HUMIDITY].pixelRegion, nextScreenState.derived.humidityText, &Font16);
 
     return renderItem;
 }
@@ -239,29 +224,6 @@ static char* buildHumidityText(float humidity, char *buffer, size_t bufferSize) 
     return buffer;
 }
 
-static struct PixelCoordinates2D buildPixelCoordinates(DisplayRegionId regionId, const char displayText[16], const sFONT *font, RegionAlignment alignment) {
-    const PixelRegion pixelRegion = displayRegions[regionId].pixelRegion;
-    const struct PixelSize2D textBoxSize = (struct PixelSize2D){ .width = strlen(displayText) * font->Width, .height = font->Height };
-    struct PixelCoordinates2D textPosition;
-
-    switch (alignment) {
-        case REGION_ALIGNMENT_CENTER:
-            textPosition = pixelRegionCenter(pixelRegion, textBoxSize);
-            break;
-        case REGION_ALIGNMENT_TOP_CENTER:
-            textPosition = pixelRegionTopCenter(pixelRegion, textBoxSize);
-            break;
-        case REGION_ALIGNMENT_TOP_RIGHT:
-            textPosition = pixelRegionTopRight(pixelRegion, textBoxSize);
-            break;
-        default:
-            textPosition = pixelRegionCenter(pixelRegion, textBoxSize);
-            break;
-    }
-
-    return textPosition;
-}
-
 static PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, PixelRegion pixelRegion, char text[16], sFONT *font) {
     PixelRenderItem renderItem = (PixelRenderItem){
         .type = RENDER_ITEM_TYPE_TEXT,
@@ -279,12 +241,6 @@ static PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, 
     return renderItem;
 }
 
-static void initRenderGrid(void)
-{
-    cellWidth = gridConfig.width / gridConfig.columns;
-    cellHeight = gridConfig.height / gridConfig.rows;    
-}
-
 static void initRenderRegions(void)
 {
     displayRegions[DISPLAY_REGION_CLOCK].gridRegion = (struct GridRegion){ .x = 4, .y = 0, .width = 1, .height = 1 };
@@ -292,52 +248,19 @@ static void initRenderRegions(void)
     displayRegions[DISPLAY_REGION_HUMIDITY].gridRegion = (struct GridRegion){ .x = 1, .y = 3, .width = 3, .height = 1 };
     displayRegions[DISPLAY_REGION_ALERT].gridRegion = (struct GridRegion){.x = 0, .y = 1, .width = 1, .height = 2};
 
-    const int numberOfRegions = sizeof(displayRegions) / sizeof(displayRegions[0]);
-    for (size_t i = 0; i < numberOfRegions; i++) {
-        ESP_LOGI(TAG, "Initializing region %d", i);
-        displayRegions[i].pixelRegion = regionToPixelSpace(displayRegions[i].gridRegion);
-    }
-}
-
-static struct PixelCoordinates2D pixelRegionCenter(PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
-    const UWORD x = pixelRegion.x + (pixelRegion.width - pixelItemSize.width) / 2;
-    const UWORD y = pixelRegion.y + (pixelRegion.height - pixelItemSize.height) / 2;
-
-    return (struct PixelCoordinates2D){ .x = x, .y = y };
-}
-
-static struct PixelCoordinates2D pixelRegionTopCenter(PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
-    const UWORD x = pixelRegion.x + (pixelRegion.width - pixelItemSize.width) / 2;
-    const UWORD y = pixelRegion.y;
-
-    return (struct PixelCoordinates2D){ .x = x, .y = y };
-}
-
-static struct PixelCoordinates2D pixelRegionTopRight(PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
-    const UWORD x = pixelRegion.x + pixelRegion.width - pixelItemSize.width;
-    const UWORD y = pixelRegion.y;
-
-    return (struct PixelCoordinates2D){ .x = x, .y = y };
-}
-
-static PixelRegion regionToPixelSpace(struct GridRegion gridRegion) {
-    const int pixelX = gridRegion.x * cellWidth;
-    const int pixelY = gridRegion.y * cellHeight;
-    const int pixelWidth = gridRegion.width * cellWidth;
-    const int pixelHeight = gridRegion.height * cellHeight;
-
-    return (PixelRegion){ .x = pixelX, .y = pixelY, .width = pixelWidth, .height = pixelHeight };
+    const int regionCount = ARRAY_SIZE(displayRegions);
+    calculateDisplayRegionsPixelSpace(displayRegions, regionCount, screenLayout);
 }
 
 static void deinitDisplay(void) {
     homeScreenState = (HomeScreenState){0};
     nextScreenState = (HomeScreenState){0};
 
-    for (size_t i = 0; i < sizeof(dirtyDisplayRegions) / sizeof(dirtyDisplayRegions[0]); i++) {
+    for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
         dirtyDisplayRegions[i].isDirty = false;
     }
 
-    for (size_t i = 0; i < sizeof(displayRegions) / sizeof(displayRegions[0]); i++) {
+    for (size_t i = 0; i < ARRAY_SIZE(displayRegions); i++) {
         displayRegions[i].pixelRegion = (PixelRegion){0};
     }
 

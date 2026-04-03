@@ -13,6 +13,7 @@ typedef struct {
 typedef struct {
     ScreenId activeScreen;
     ScreenGeneration screenGeneration;
+    ScreenId lastNonMenuScreen;
 } NavigationState;
 
 typedef struct {
