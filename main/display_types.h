@@ -6,7 +6,8 @@
 
 #include "GUI_Paint.h"
 
-#define MAX_RENDER_ITEMS 12
+#define MAX_RENDER_ITEMS_PER_REGION 4
+#define MAX_RENDER_SCENES 8
 
 struct GridConfig {
     int width;
@@ -79,7 +80,6 @@ typedef enum {
 
 typedef struct {
     RenderItemType type;
-    PixelRegion pixelRegion;
     union {
         struct {
             struct PixelCoordinates2D position;
@@ -109,7 +109,14 @@ typedef struct {
 } PixelRenderItem;
 
 typedef struct {
-    PixelRenderItem items[MAX_RENDER_ITEMS];
+    DisplayRegionId regionId;
+    PixelRegion pixelRegion;
+    PixelRenderItem renderItems[MAX_RENDER_ITEMS_PER_REGION];
+    size_t count;
+} RenderRegionScene;
+
+typedef struct {
+    RenderRegionScene regions[MAX_RENDER_SCENES];
     size_t count;
 } DisplayRenderPlan;
 
