@@ -26,8 +26,16 @@ task_manager_error initTaskManager() {
     displayQueue = xQueueCreate(10, sizeof(DisplayRequest));
     appEventQueue = xQueueCreate(10, sizeof(AppEvent));
 
-    if (displayQueue == NULL || appEventQueue == NULL) {
-        ESP_LOGE(TAG, "Failed to create queues");
+    if (displayQueue == NULL) {
+        ESP_LOGE(TAG, "Failed to create display queue");
+        return TASK_MANAGER_FAIL;
+    }
+
+    appEventQueue = xQueueCreate(10, sizeof(AppEvent));
+    if (appEventQueue == NULL) {
+        ESP_LOGE(TAG, "Failed to create app event queue");
+        vQueueDelete(displayQueue);
+        displayQueue = NULL;
         return TASK_MANAGER_FAIL;
     }
     
