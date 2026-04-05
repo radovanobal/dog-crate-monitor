@@ -24,8 +24,7 @@ static QueueHandle_t appEventQueue = NULL;
 
 task_manager_error initTaskManager() {
     displayQueue = xQueueCreate(10, sizeof(DisplayRequest));
-    appEventQueue = xQueueCreate(10, sizeof(AppEvent));
-
+    
     if (displayQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create display queue");
         return TASK_MANAGER_FAIL;
