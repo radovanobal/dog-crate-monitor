@@ -123,7 +123,7 @@ static bool shouldUpdateLastDataScreenId(ScreenPurpose purpose) {
 static void handleInputEvent(const AppEvent *event, const AppState *state, ScreenActionResult *result) {
     if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_BUTTON_SELECT) {
         ScreenIntent intent = {
-            .intentType = SCREEN_INTENT_SET_ACTIVE_SCREEN,
+            .intentType = SCREEN_INTENT_TYPE_SCREEN_CHANGE,
             .data.screenId = state->sharedState.navigationState.activeScreen == SCREEN_ID_MENU ? lastDataScreenId : SCREEN_ID_MENU
         };
         result->screenIntent = intent;

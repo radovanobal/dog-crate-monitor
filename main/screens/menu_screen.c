@@ -4,6 +4,7 @@
 #include "epaper_port.h"
 
 #include "menu_screen.h"
+#include "../button_event.h"
 #include "../screen_manager.h"
 #include "../screen_types.h"
 #include "../screen_layout.h"
@@ -21,6 +22,7 @@ typedef struct {
     MenuItem items[5];
     size_t count;
     int selectedIndex;
+    int activeIndex;
 } MenuState;
 
 static const char *TAG = "menu_screen";
@@ -87,14 +89,39 @@ static void initMenuState(void) {
                 .text = "Home",
                 .font = &Font18,
                 .targetScreenId = SCREEN_ID_HOME
-            }
+            },
+            [1] = (MenuItem){
+                .text = "Settings",
+                .font = &Font18,
+                .targetScreenId = SCREEN_ID_SETTINGS
+            },
         },
-        .count = 1,
-        .selectedIndex = 0
+        .count = 2,
+        .selectedIndex = 0,
+        .activeIndex = 0
     };
 }
 
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state) {
+    if (event->eventType == APP_EVENT_INPUT_RECEIVED) {
+        if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_ROTARY_ENCODER_UP) {
+            menuState.selectedIndex = (menuState.selectedIndex - 1 + menuState.count) % menuState.count;
+            ESP_LOGI(TAG, "Menu item up selected. New selected index: %d", menuState.selectedIndex);
+        } else if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_ROTARY_ENCODER_DOWN) {
+            menuState.selectedIndex = (menuState.selectedIndex + 1) % menuState.count;
+            ESP_LOGI(TAG, "Menu item down selected. New selected index: %d", menuState.selectedIndex);
+        } else if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_ROTARY_ENCODER_PRESS) {
+            ScreenId targetScreenId = menuState.items[menuState.selectedIndex].targetScreenId;
+            ScreenIntent intent = {
+                .intentType = SCREEN_INTENT_TYPE_SCREEN_CHANGE,
+                .data.screenId = targetScreenId
+            };
+            ESP_LOGI(TAG, "Menu item select pressed. Changing to screen ID: %d", targetScreenId);
+            return (ScreenActionResult){
+                .screenIntent = intent
+            };
+        }
+    }
 
     return (ScreenActionResult){
         .screenIntent = {
@@ -103,19 +130,19 @@ static ScreenActionResult handleEvent(const AppEvent *event, const AppState *sta
     };
 }
 
+
 static void markActiveMenuItem(const AppState *state) {
     for (size_t i = 0; i < menuState.count; i++) {
         if(menuState.items[i].targetScreenId == state->sharedState.navigationState.activeScreen) {
-            menuState.selectedIndex = i;
+            menuState.activeIndex = i;
             break;
         }
     }
 }
 
 static ScreenRenderResult evaluateDisplay(const AppState *state) {
-    DisplayRenderPlan displayRenderPlan = buildDisplayRenderPlan(state);
-
     markActiveMenuItem(state);
+    DisplayRenderPlan displayRenderPlan = buildDisplayRenderPlan(state);
 
     return (ScreenRenderResult){
         .displayRenderPlan = displayRenderPlan
@@ -124,23 +151,50 @@ static ScreenRenderResult evaluateDisplay(const AppState *state) {
 
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state) {
     DisplayRenderPlan displayRenderPlan = {0};
-    size_t renderItemIndex = 0;
+    size_t sceneItemIndex = 0;
 
     determineDirtyRegions();
 
     if (dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty) {
-        struct PixelCoordinates2D textPosition = calculateAlignedTextPosition(
-            &displayRegions[DISPLAY_REGION_MAIN_MENU], 
-            menuState.items[menuState.selectedIndex].text, 
-            menuState.items[menuState.selectedIndex].font, 
-            REGION_ALIGNMENT_TOP_LEFT
-        );
+        RenderRegionScene menuItemScene = {
+            .regionId = DISPLAY_REGION_MAIN_MENU,
+            .pixelRegion = displayRegions[DISPLAY_REGION_MAIN_MENU].pixelRegion,
+            .renderItems = {{0}},
+            .count = 0
+        };
 
-        PixelRenderItem menuItemRenderItem = createTextRenderItem(textPosition, menuState.items[menuState.selectedIndex].text, menuState.items[menuState.selectedIndex].font);
-        displayRenderPlan.regions[renderItemIndex++].renderItems[0] = menuItemRenderItem;
+        int renderItemCount = 0;
+        for (size_t i = 0; i < menuState.count; i++) {
+            struct PixelCoordinates2D textPosition = calculateAlignedTextPosition(
+                &displayRegions[DISPLAY_REGION_MAIN_MENU], 
+                menuState.items[i].text, 
+                menuState.items[i].font, 
+                REGION_ALIGNMENT_TOP_LEFT
+            );
+
+            textPosition.y += i * (menuState.items[i].font->Height + 10); // Add vertical spacing between items
+
+            PixelRenderItem menuItemRenderItem = createTextRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font);
+            menuItemScene.renderItems[renderItemCount++] = menuItemRenderItem;
+
+
+            if (i == menuState.selectedIndex) {
+                PixelRenderItem selectionIndicator = createTextUnderlineRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font, DOT_PIXEL_2X2);
+                menuItemScene.renderItems[renderItemCount++] = selectionIndicator;
+                ESP_LOGI(TAG, "Marking menu item '%s' as selected", menuState.items[i].text);
+            } else if(i == menuState.activeIndex) {
+                PixelRenderItem activeIndicator = createTextUnderlineRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font, DOT_PIXEL_1X1);
+                menuItemScene.renderItems[renderItemCount++] = activeIndicator;
+                ESP_LOGI(TAG, "Marking menu item '%s' as active", menuState.items[i].text);
+            } 
+
+        }
+
+        menuItemScene.count = renderItemCount;
+        displayRenderPlan.regions[sceneItemIndex++] = menuItemScene;
     }
 
-    displayRenderPlan.count = renderItemIndex;
+    displayRenderPlan.count = sceneItemIndex;
     return displayRenderPlan;
 }
 
@@ -155,5 +209,5 @@ static void determineDirtyRegions(void) {
 }
 
 static void deinitDisplay(void) {
-
+    menuState = (MenuState){0};
 }

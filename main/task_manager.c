@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdbool.h>
+
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-
-#include "esp_log.h"
 
 #include "./task_manager.h"
 #include "./utils.h"
@@ -24,7 +24,7 @@ static QueueHandle_t appEventQueue = NULL;
 
 task_manager_error initTaskManager() {
     displayQueue = xQueueCreate(10, sizeof(DisplayRequest));
-    
+
     if (displayQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create display queue");
         return TASK_MANAGER_FAIL;

@@ -30,7 +30,7 @@ void appDispatcher_handleEnvironmentUpdateEvent(float temperatureC, float relati
 }
 
 void appDispatcher_applyScreenIntent(const ScreenIntent *intent) {
-    if (intent->intentType == SCREEN_INTENT_SET_ACTIVE_SCREEN) {
+    if (intent->intentType == SCREEN_INTENT_TYPE_SCREEN_CHANGE) {
         appStore_updateNavigationState(&appState, intent->data.screenId);
     }
 }
