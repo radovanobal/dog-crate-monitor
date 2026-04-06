@@ -18,15 +18,24 @@ static void initCommunications(void);
 void app_main(void)
 {
     initCommunications();
-    displayController_init();
+    
+    const display_init_error err = displayController_init();
+    
+    if (err != DISPLAY_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to initialize display controller with error code: %d", err);
+        return;
+    }
+    
     appDispatcher_init();
     buttonEvent_init();
 
     if(initEnvironment() != ENV_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to initialize environment");
         return;
     }
 
     if(initTaskManager() != TASK_MANAGER_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to initialize task manager");
         return;
     }
 
