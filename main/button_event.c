@@ -27,14 +27,13 @@ bool buttonEvent_wait(ButtonEvent *event, TickType_t ticksToWait) {
         key_groups, 
         wakeButtonBits, // Wake button bits for all buttons
         pdTRUE, 
-        pdFALSE, 
-        portMAX_DELAY
+        pdFALSE,
+        ticksToWait
     );
 
     EventBits_t relevantBits = keyEventBits & wakeButtonBits;
 
     if (relevantBits == 0) {
-        ESP_LOGW(TAG, "No button event bits set");
         return false;
     }
 
