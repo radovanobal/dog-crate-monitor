@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include "display_types.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
 #include "freertos/task.h"
@@ -14,6 +15,9 @@
 #include "./app_dispatcher.h"
 #include "./button_event.h"
 #include "./screen_manager.h"
+
+static void mergeDisplayRequests(DisplayRequest *accumulator, DisplayRequest *candidate);
+static int findRegionInDisplayRequest(const DisplayRequest *request, DisplayRegionId regionId);
 
 // Log tag
 static const char *TAG = "task_manager";
@@ -106,20 +110,43 @@ void renderTask(void *pvParameters) {
             ESP_LOGW(TAG, "Failed to receive display request from queue");
             continue;
         }
+
+        DisplayRequest candidate;
+        DisplayRequest accumulator = renderResult;
         
+        for (;;) {
+            if (xQueueReceive(displayQueue, &candidate, 0) != pdPASS) {
+                ESP_LOGI(TAG, "No more display requests in queue to merge for this pass");
+                break; // queue drained for this pass
+            }
+
+            if (candidate.screenGeneration < accumulator.screenGeneration) {
+                // stale older work, ignore
+                continue;
+            }
+
+            if (candidate.screenGeneration > accumulator.screenGeneration) {
+                // newer generation invalidates old accumulated work
+                accumulator = candidate;
+                continue;
+            }
+
+            mergeDisplayRequests(&accumulator, &candidate);
+        }
+
         const AppState *state = appDispatcher_getAppState();
         const ScreenGeneration screenGeneration = state->sharedState.navigationState.screenGeneration;
 
-        if (renderResult.screenGeneration != screenGeneration) {
+        if (accumulator.screenGeneration != screenGeneration) {
            ESP_LOGE(TAG,
                 "BUG: stale render request generation %u received while active generation is %u",
-                (unsigned)renderResult.screenGeneration,
+                (unsigned)accumulator.screenGeneration,
                 (unsigned)screenGeneration
             );
             continue;
         }
 
-        screenManager_render(&renderResult);
+        screenManager_render(&accumulator);
     }
 }
 
@@ -166,7 +193,9 @@ void serviceTask(void *pvParameters) {
             ESP_LOGE(TAG, "Failed to read environment data or time");
             vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(5000)); // Delay before retrying
             continue;
-        } else if (overallStatus == ENV_WARNING) {
+        }
+        
+        if (overallStatus == ENV_WARNING) {
             delayDuration = 2000; // known stale state, try get fresh data sooner
             ESP_LOGW(TAG, "Environment data or time is in warning state");
         }
@@ -179,4 +208,44 @@ void serviceTask(void *pvParameters) {
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(delayDuration)); // Delay before the next reading
     }
+}
+
+static void mergeDisplayRequests(DisplayRequest *accumulator, DisplayRequest *candidate) {
+    if (candidate->screenGeneration != accumulator->screenGeneration) {
+        ESP_LOGE(TAG,
+            "BUG: Attempting to merge display requests of different generations: %u and %u",
+            (unsigned)accumulator->screenGeneration,
+            (unsigned)candidate->screenGeneration
+        );
+        return;
+    }
+
+    for (size_t i = 0; i < candidate->displayRenderPlan.count; i++) {
+        const RenderRegionScene *candidateRegion = &candidate->displayRenderPlan.regions[i];
+        const int accumulatorRegionIndex = findRegionInDisplayRequest(accumulator, candidateRegion->regionId);
+
+        if (accumulatorRegionIndex < 0) {
+            // region from candidate not in accumulator, add it
+            if (accumulator->displayRenderPlan.count >= MAX_RENDER_SCENES) {
+                ESP_LOGW(TAG, "Cannot merge display request: accumulator render plan is full");
+                return;
+            }
+            
+            accumulator->displayRenderPlan.regions[accumulator->displayRenderPlan.count++] = *candidateRegion;
+            continue;
+        }
+
+        // region from candidate already in accumulator, replace it
+        accumulator->displayRenderPlan.regions[accumulatorRegionIndex] = *candidateRegion;
+    }
+}
+
+static int findRegionInDisplayRequest(const DisplayRequest *request, DisplayRegionId regionId) {
+    for (size_t i = 0; i < request->displayRenderPlan.count; i++) {
+        if (request->displayRenderPlan.regions[i].regionId == regionId) {
+            return i;
+        }
+    }
+
+    return -1;
 }

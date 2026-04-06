@@ -44,7 +44,7 @@ void app_main(void)
         return;
     }   
 
-    if(xTaskCreatePinnedToCore(renderTask, "renderTask", 4096, NULL, 4, NULL, 0) != pdPASS) {
+    if(xTaskCreatePinnedToCore(renderTask, "renderTask", 8192, NULL, 4, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create Render task");
         return;
     }

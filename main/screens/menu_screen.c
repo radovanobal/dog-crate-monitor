@@ -177,7 +177,6 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state) {
             PixelRenderItem menuItemRenderItem = createTextRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font);
             menuItemScene.renderItems[renderItemCount++] = menuItemRenderItem;
 
-
             if (i == menuState.selectedIndex) {
                 PixelRenderItem selectionIndicator = createTextUnderlineRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font, DOT_PIXEL_2X2);
                 menuItemScene.renderItems[renderItemCount++] = selectionIndicator;
@@ -187,7 +186,6 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state) {
                 menuItemScene.renderItems[renderItemCount++] = activeIndicator;
                 ESP_LOGI(TAG, "Marking menu item '%s' as active", menuState.items[i].text);
             } 
-
         }
 
         menuItemScene.count = renderItemCount;
