@@ -10,6 +10,7 @@ Related decisions:
 
 1. [ADR 0001: Screen and Display Ownership Boundaries](decisions/0001-screen-display-ownership.md)
 2. [ADR 0002: Screen Transition and Render Invalidation Policy](decisions/0002-screen-transition-render-invalidation.md)
+3. [ADR 0003: Generation-Scoped Render Coalescing](decisions/0003-generation-scoped-render-coalescing.md)
 
 ## Design Goals
 
@@ -237,3 +238,5 @@ Those details can evolve while preserving the ownership boundaries defined here.
 4. How much screen-local state should survive screen deactivation?
 
 For decisions already made about ownership and render invalidation, see [ADR 0001: Screen and Display Ownership Boundaries](decisions/0001-screen-display-ownership.md) and [ADR 0002: Screen Transition and Render Invalidation Policy](decisions/0002-screen-transition-render-invalidation.md).
+
+For the queued-render coalescing policy within one active-screen generation, see [ADR 0003: Generation-Scoped Render Coalescing](decisions/0003-generation-scoped-render-coalescing.md).
