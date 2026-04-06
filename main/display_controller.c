@@ -1,13 +1,11 @@
 #include <stdint.h>
 
 #include "epaper_port.h"
-#include "epaper_bsp.h"
 #include "GUI_Paint.h"
 
 #include "./display_controller.h"
 #include "./display_types.h"
 #include "./screen_types.h"
-#include "./utils/macros.h"
 
 typedef struct {
     RenderRegionScene scenes[MAX_RENDER_SCENES];

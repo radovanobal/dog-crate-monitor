@@ -1,4 +1,3 @@
-#include "epaper_port.h"
 #include "GUI_Paint.h"
 
 #include "screen_render.h"

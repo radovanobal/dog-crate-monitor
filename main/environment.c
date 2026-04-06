@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stddef.h>
 
 #include "esp_log.h"

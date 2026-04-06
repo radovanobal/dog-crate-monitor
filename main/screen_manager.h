@@ -5,8 +5,6 @@
 
 #include "./app_event.h"
 #include "./app_store.h"
-#include "./display_types.h"
-#include "./display_controller.h"
 #include "./screen_types.h"
 
 typedef enum {

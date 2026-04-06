@@ -2,7 +2,6 @@
 
 #include "./screen_manager.h"
 #include "./screen_types.h"
-#include "./display_types.h"
 #include "./display_controller.h"
 #include "./app_event.h"
 #include "./app_store.h"

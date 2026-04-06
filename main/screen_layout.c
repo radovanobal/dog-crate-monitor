@@ -1,6 +1,5 @@
 #include "screen_layout.h"
 #include "display_types.h"
-#include "./utils/macros.h"
 
 
 ScreenLayout initRenderGrid(const struct GridConfig gridConfig)

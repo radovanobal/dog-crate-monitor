@@ -1,7 +1,6 @@
 
 #include <stdbool.h>
 
-#include "freertos/FreeRTOS.h"
 #include "button_bsp.h"
 #include "esp_log.h"
 

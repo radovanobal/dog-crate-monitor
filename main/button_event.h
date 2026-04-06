@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "freertos/FreeRTOS.h"
+#include "portmacro.h"
 
 typedef enum {
     BUTTON_EVENT_TYPE_NONE = 0,

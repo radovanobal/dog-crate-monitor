@@ -4,7 +4,6 @@
 #include "./environment_types.h"
 #include "./app_event.h"
 #include "./app_store.h"
-#include "./button_event.h"
 #include "./screen_manager.h"
 
 void appDispatcher_init();

@@ -4,8 +4,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
-#include "./environment_types.h"
-
 typedef enum {
     TASK_MANAGER_SUCCESS = 0,
     TASK_MANAGER_FAIL = -1

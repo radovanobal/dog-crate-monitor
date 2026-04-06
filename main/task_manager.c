@@ -2,7 +2,7 @@
 #include <stdbool.h>
 
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
+#include "freertos/FreeRTOS.h" // IWYU pragma: keep
 #include "freertos/task.h"
 #include "freertos/queue.h"
 
@@ -14,7 +14,6 @@
 #include "./app_dispatcher.h"
 #include "./button_event.h"
 #include "./screen_manager.h"
-#include "./display_controller.h"
 
 // Log tag
 static const char *TAG = "task_manager";
