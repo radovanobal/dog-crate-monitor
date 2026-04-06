@@ -8,9 +8,9 @@
 
 // Log tag
 static const char *TAG = "button_event";
-static const EventBits_t wakeButtonBits = set_bit_button(0) 
-    | set_bit_button(7) 
-    | set_bit_button(14) 
+static const EventBits_t wakeButtonBits = set_bit_button(2) 
+    | set_bit_button(9) 
+    | set_bit_button(16) 
     | set_bit_button(21);
 
 void buttonEvent_init(void) {
@@ -39,19 +39,19 @@ bool buttonEvent_wait(ButtonEvent *event, TickType_t ticksToWait) {
 
     event->stepCount = 1; // Step count is not used in current implementation, set to 1
 
-    if(relevantBits & set_bit_button(0)) {
+    if(relevantBits & set_bit_button(2)) {
         event->pressType = BUTTON_PRESS_TYPE_SINGLE_CLICK;
         event->buttonType = BUTTON_EVENT_TYPE_ROTARY_ENCODER_UP;
         return true;
     }
 
-    if (relevantBits & set_bit_button(7)) {
+    if (relevantBits & set_bit_button(9)) {
         event->pressType = BUTTON_PRESS_TYPE_SINGLE_CLICK;
         event->buttonType = BUTTON_EVENT_TYPE_ROTARY_ENCODER_PRESS;
         return true;
     }
 
-    if (relevantBits & set_bit_button(14)) {
+    if (relevantBits & set_bit_button(16)) {
         event->pressType = BUTTON_PRESS_TYPE_SINGLE_CLICK;
         event->buttonType = BUTTON_EVENT_TYPE_ROTARY_ENCODER_DOWN;
         return true;
