@@ -56,12 +56,12 @@ void displayController_deinit(void) {
 }
 
 void displayController_requestRender(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration) {
-    DisplayPaintType paintType = determinePaintType(displayRenderPlan, screenGeneration);
-
     if(didScreenGenerationChanged(screenGeneration, lastRenderedScreenGeneration)) {
         clearCachedScenePlan();
     }
 
+    DisplayPaintType paintType = determinePaintType(displayRenderPlan, screenGeneration);
+    
     updateRenderPlanCache(displayRenderPlan);
 
     switch (paintType) {
@@ -117,16 +117,6 @@ static bool didScreenGenerationChanged(ScreenGeneration current, ScreenGeneratio
 }
 
 static DisplayPaintType determinePaintType(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration) {
-    if (displayRenderPlan->count == 0) {
-        ESP_LOGW(TAG, "No items to render in the display render plan");
-        return DISPLAY_PAINT_TYPE_NONE;
-    }
-
-    if (doesScenePlanMatchCache(displayRenderPlan)) {
-        ESP_LOGI(TAG, "Display render plan matches cache. No paint required.");
-        return DISPLAY_PAINT_TYPE_NONE;
-    }
-
     if (didScreenGenerationChanged(screenGeneration, lastRenderedScreenGeneration)) {
         ESP_LOGI(TAG, "Screen generation changed from %u to %u. Forcing full render.",
             (unsigned)lastRenderedScreenGeneration,
@@ -136,6 +126,16 @@ static DisplayPaintType determinePaintType(const DisplayRenderPlan *displayRende
         return DISPLAY_PAINT_TYPE_FULL;
     }
     
+    if (doesScenePlanMatchCache(displayRenderPlan)) {
+        ESP_LOGI(TAG, "Display render plan matches cache. No paint required.");
+        return DISPLAY_PAINT_TYPE_NONE;
+    }
+
+    if (displayRenderPlan->count == 0) {
+        ESP_LOGW(TAG, "No items to render in the display render plan");
+        return DISPLAY_PAINT_TYPE_NONE;
+    }
+
     if (partialRenderCount >= maxPartialRenderCount) {
         ESP_LOGI(TAG, "Max partial render count reached. Forcing full render.");
         return DISPLAY_PAINT_TYPE_FULL;
