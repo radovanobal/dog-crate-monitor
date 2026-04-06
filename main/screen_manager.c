@@ -18,7 +18,7 @@ static const char *TAG = "screen_manager";
 
 static ScreenRegistration registeredScreen = {0};
 static ScreenGeneration lastScreenGeneration = 0;
-static const ScreenPurpose nonReturnablePurposes[] = { SCREEN_PURPOSE_NAVIGATION, SCREEN_PURPOSE_SETTINGS };
+static const ScreenPurpose nonReturnablePurposes[] = { SCREEN_PURPOSE_NAVIGATION };
 static ScreenId lastDataScreenId = SCREEN_ID_HOME;
 
 void screenManager_render(DisplayRequest *displayRequest) {
