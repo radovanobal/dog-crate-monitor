@@ -1,6 +1,5 @@
 #include <stdbool.h>
 
-#include "esp_log.h"
 #include "epaper_port.h"
 
 #include "menu_screen.h"
