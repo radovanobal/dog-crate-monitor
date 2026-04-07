@@ -52,9 +52,13 @@ static void initMenuState(void);
 static void deinitDisplay(void);
 static void determineDirtyRegions(void);
 static void markActiveMenuItem(const AppState *state);
+static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator);
+static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator);
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state);
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state);
 static ScreenRenderResult evaluateDisplay(const AppState *state);
+static struct PixelCoordinates2D setMenuItemPosition(size_t index);
+
 
 const ScreenInterface *menuScreen_getScreenInterface(void) {
     static const ScreenInterface screenInterface = {
@@ -151,49 +155,73 @@ static ScreenRenderResult evaluateDisplay(const AppState *state) {
 
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state) {
     DisplayRenderPlan displayRenderPlan = {0};
-    size_t sceneItemIndex = 0;
 
     determineDirtyRegions();
 
-    if (dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty) {
-        RenderRegionScene menuItemScene = {
-            .regionId = DISPLAY_REGION_MAIN_MENU,
-            .pixelRegion = displayRegions[DISPLAY_REGION_MAIN_MENU].pixelRegion,
-            .renderItems = {{0}},
-            .count = 0
-        };
-
-        int renderItemCount = 0;
-        for (size_t i = 0; i < menuState.count; i++) {
-            struct PixelCoordinates2D textPosition = calculateAlignedTextPosition(
-                &displayRegions[DISPLAY_REGION_MAIN_MENU], 
-                menuState.items[i].text, 
-                menuState.items[i].font, 
-                REGION_ALIGNMENT_TOP_LEFT
-            );
-
-            textPosition.y += i * (menuState.items[i].font->Height + 10); // Add vertical spacing between items
-
-            PixelRenderItem menuItemRenderItem = createTextRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font);
-            menuItemScene.renderItems[renderItemCount++] = menuItemRenderItem;
-
-            if (i == menuState.selectedIndex) {
-                PixelRenderItem selectionIndicator = createTextUnderlineRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font, DOT_PIXEL_2X2);
-                menuItemScene.renderItems[renderItemCount++] = selectionIndicator;
-                ESP_LOGI(TAG, "Marking menu item '%s' as selected", menuState.items[i].text);
-            } else if(i == menuState.activeIndex) {
-                PixelRenderItem activeIndicator = createTextUnderlineRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font, DOT_PIXEL_1X1);
-                menuItemScene.renderItems[renderItemCount++] = activeIndicator;
-                ESP_LOGI(TAG, "Marking menu item '%s' as active", menuState.items[i].text);
-            } 
-        }
-
-        menuItemScene.count = renderItemCount;
-        displayRenderPlan.regions[sceneItemIndex++] = menuItemScene;
+    if (!dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty) {
+        return displayRenderPlan;
     }
 
-    displayRenderPlan.count = sceneItemIndex;
+    RenderRegionScene menuItemScene = {
+        .regionId = DISPLAY_REGION_MAIN_MENU,
+        .pixelRegion = displayRegions[DISPLAY_REGION_MAIN_MENU].pixelRegion,
+        .renderItems = {{0}},
+        .count = 0
+    };
+
+    for (size_t i = 0; i < menuState.count; i++) {
+        struct PixelCoordinates2D textPosition = setMenuItemPosition(i);
+
+        PixelRenderItem menuItemRenderItem = createTextRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font);
+        menuItemScene.renderItems[menuItemScene.count++] = menuItemRenderItem;
+
+        PixelRenderItem indicatorRenderItem = {0};
+        if (setMenuItemIndicator(i, textPosition, &indicatorRenderItem)) {
+            menuItemScene.renderItems[menuItemScene.count++] = indicatorRenderItem;
+        }
+    }
+    
+    displayRenderPlan.regions[displayRenderPlan.count++] = menuItemScene;
     return displayRenderPlan;
+}
+
+static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator) {
+    if (index == menuState.selectedIndex) {
+        *indicator = createTextUnderlineRenderItem(
+            textPosition, 
+            menuState.items[index].text, 
+            menuState.items[index].font, 
+            DOT_PIXEL_2X2
+        );
+
+        return true;
+    }
+
+    if (index == menuState.activeIndex) {
+        *indicator = createTextUnderlineRenderItem(
+            textPosition, 
+            menuState.items[index].text, 
+            menuState.items[index].font, 
+            DOT_PIXEL_1X1
+        );
+
+        return true;
+    }
+
+    return false;
+}
+
+static struct PixelCoordinates2D setMenuItemPosition(size_t index) {
+    struct PixelCoordinates2D position = calculateAlignedTextPosition(
+        &displayRegions[DISPLAY_REGION_MAIN_MENU], 
+        menuState.items[index].text, 
+        menuState.items[index].font, 
+        REGION_ALIGNMENT_TOP_LEFT
+    );
+
+    position.y += index * (menuState.items[index].font->Height + 10); // Add vertical spacing between items
+
+    return position;
 }
 
 static void determineDirtyRegions(void) {
@@ -201,9 +229,7 @@ static void determineDirtyRegions(void) {
         dirtyDisplayRegions[i].isDirty = false;
     }
 
-    //if () {
-        dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty = true; // TODO scroll will have to mark this region dirty after first paint
-    //}
+    dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty = true; // TODO scroll will have to mark this region dirty after first paint
 }
 
 static void deinitDisplay(void) {
