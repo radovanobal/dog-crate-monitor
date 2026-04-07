@@ -107,31 +107,38 @@ static void initMenuState(void) {
 }
 
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state) {
-    if (event->eventType == APP_EVENT_INPUT_RECEIVED) {
-        if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_ROTARY_ENCODER_UP) {
-            menuState.selectedIndex = (menuState.selectedIndex - 1 + menuState.count) % menuState.count;
-            ESP_LOGI(TAG, "Menu item up selected. New selected index: %d", menuState.selectedIndex);
-        } else if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_ROTARY_ENCODER_DOWN) {
-            menuState.selectedIndex = (menuState.selectedIndex + 1) % menuState.count;
-            ESP_LOGI(TAG, "Menu item down selected. New selected index: %d", menuState.selectedIndex);
-        } else if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_ROTARY_ENCODER_PRESS) {
-            ScreenId targetScreenId = menuState.items[menuState.selectedIndex].targetScreenId;
-            ScreenIntent intent = {
-                .intentType = SCREEN_INTENT_TYPE_SCREEN_CHANGE,
-                .data.screenId = targetScreenId
-            };
-            ESP_LOGI(TAG, "Menu item select pressed. Changing to screen ID: %d", targetScreenId);
-            return (ScreenActionResult){
-                .screenIntent = intent
-            };
-        }
-    }
-
-    return (ScreenActionResult){
+    ScreenActionResult intent = {
         .screenIntent = {
             .intentType = SCREEN_INTENT_TYPE_NONE
         }
     };
+
+    if (event->eventType != APP_EVENT_INPUT_RECEIVED) {
+        return intent;
+    }
+
+    switch(event->data.inputEventData.buttonType) {
+        case BUTTON_EVENT_TYPE_ROTARY_ENCODER_UP:
+            menuState.selectedIndex = (menuState.selectedIndex - 1 + menuState.count) % menuState.count;
+
+            break;
+        case BUTTON_EVENT_TYPE_ROTARY_ENCODER_DOWN:
+            menuState.selectedIndex = (menuState.selectedIndex + 1) % menuState.count;
+
+            break;
+        case BUTTON_EVENT_TYPE_ROTARY_ENCODER_PRESS: {
+            ScreenId targetScreenId = menuState.items[menuState.selectedIndex].targetScreenId;
+            intent.screenIntent.intentType = SCREEN_INTENT_TYPE_SCREEN_CHANGE;
+            intent.screenIntent.data.screenId = targetScreenId;
+
+            break;
+        }
+        default:
+            // No action for other buttons, only rotary encoder up/down/press are handled in menu screen
+            break;    
+    }
+
+    return intent;
 }
 
 
