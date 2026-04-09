@@ -1,18 +1,33 @@
-#include <stdbool.h>
-
+#include "display_types.h"
 #include "epaper_port.h"
 
-#include "menu_screen.h"
-#include "../button_event.h"
+#include "./settings_screen.h"
 #include "../screen_manager.h"
 #include "../screen_types.h"
 #include "../screen_layout.h"
 #include "../screen_render.h"
-#include "../display_types.h"
 #include "../utils/macros.h"
 
+typedef struct {
+    MenuItem items[5];
+    size_t count;
+    int selectedIndex;
+    int activeIndex;
+} SettingsMenuState;
 
-static const char *TAG = "menu_screen";
+static void initDisplay(void);
+static void deinitDisplay(void);
+static void initMenuItems(void);
+static void initRenderRegions(void);
+static void determineDirtyRegions(void);
+static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state);
+static ScreenRenderResult evaluateDisplay(const AppState *state);
+static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state);
+static struct PixelCoordinates2D setMenuItemPosition(size_t index);
+static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator);
+
+static SettingsMenuState menuState = {0};
+static ScreenLayout screenLayout;
 
 static const struct GridConfig gridConfig = {
     .width = EPD_WIDTH,
@@ -30,26 +45,9 @@ static DirtyRegionEntry dirtyDisplayRegions[] = {
     [DISPLAY_REGION_MAIN_MENU] = { .regionId = DISPLAY_REGION_MAIN_MENU, .isDirty = false },
 };
 
-static ScreenLayout screenLayout;
-static MenuState menuState = {0};
-
-static void initDisplay(void);
-static void initRenderRegions(void);
-static void initMenuState(void);
-static void deinitDisplay(void);
-static void determineDirtyRegions(void);
-static void markActiveMenuItem(const AppState *state);
-static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator);
-static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator);
-static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state);
-static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state);
-static ScreenRenderResult evaluateDisplay(const AppState *state);
-static struct PixelCoordinates2D setMenuItemPosition(size_t index);
-
-
-const ScreenInterface *menuScreen_getScreenInterface(void) {
+const ScreenInterface *settingsScreen_getScreenInterface(void) {
     static const ScreenInterface screenInterface = {
-        .purpose = SCREEN_PURPOSE_NAVIGATION,
+        .purpose = SCREEN_PURPOSE_SETTINGS,
         .init = initDisplay,
         .handleEvent = handleEvent,
         .evaluateDisplay = evaluateDisplay,
@@ -62,7 +60,9 @@ const ScreenInterface *menuScreen_getScreenInterface(void) {
 static void initDisplay(void) {
     screenLayout = initRenderGrid(gridConfig);
     initRenderRegions();
-    initMenuState();
+    initMenuItems();
+
+    // Initialize settings screen display resources here
 }
 
 static void initRenderRegions(void)
@@ -73,24 +73,41 @@ static void initRenderRegions(void)
     calculateDisplayRegionsPixelSpace(displayRegions, regionCount, screenLayout);
 }
 
-static void initMenuState(void) {
-    menuState = (MenuState){
+static void initMenuItems() {
+    menuState = (SettingsMenuState){
         .items = {
-            [0] = (MenuItem){
-                .text = "Home",
+            {
+                .text = "Wi-Fi",
                 .font = &Font18,
-                .targetScreenId = SCREEN_ID_HOME
+                .targetScreenId = SCREEN_ID_WIFI_SETTINGS
             },
-            [1] = (MenuItem){
-                .text = "Settings",
+            {
+                .text = "Display",
                 .font = &Font18,
-                .targetScreenId = SCREEN_ID_SETTINGS
-            },
+                .targetScreenId = SCREEN_ID_DISPLAY_SETTINGS
+            }
         },
         .count = 2,
         .selectedIndex = 0,
-        .activeIndex = 0
+        .activeIndex = -1
     };
+}
+
+static void determineDirtyRegions(void) {
+    for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
+        dirtyDisplayRegions[i].isDirty = false;
+    }
+
+    dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty = true; // TODO scroll will have to mark this region dirty after first paint
+}
+
+static void deinitDisplay(void) {
+    for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
+        dirtyDisplayRegions[i].isDirty = false;
+    }
+
+    dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty = true; // TODO scroll will have to mark this region dirty after first paint
+
 }
 
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state) {
@@ -127,7 +144,6 @@ static ScreenActionResult handleEvent(const AppEvent *event, const AppState *sta
 
     return intent;
 }
-
 
 static void markActiveMenuItem(const AppState *state) {
     for (size_t i = 0; i < menuState.count; i++) {
@@ -218,14 +234,3 @@ static struct PixelCoordinates2D setMenuItemPosition(size_t index) {
     return position;
 }
 
-static void determineDirtyRegions(void) {
-    for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
-        dirtyDisplayRegions[i].isDirty = false;
-    }
-
-    dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty = true; // TODO scroll will have to mark this region dirty after first paint
-}
-
-static void deinitDisplay(void) {
-    menuState = (MenuState){0};
-}

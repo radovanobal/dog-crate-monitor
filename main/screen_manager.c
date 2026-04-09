@@ -8,6 +8,7 @@
 #include "./utils/macros.h"
 #include "./screens/home_screen.h"
 #include "./screens/menu_screen.h"
+#include "./screens/settings_screen.h"
 
 static void handleInputEvent(const AppEvent *event, const AppState *state, ScreenActionResult *result);
 static ScreenRegistration createScreenRegistration(ScreenId id, const ScreenInterface *interface);
@@ -66,6 +67,25 @@ ScreenRenderResult screenManager_evaluateDisplay(const AppState *appState) {
     return registeredScreen.interface->evaluateDisplay(appState);
 }
 
+static bool tryGetScreenInterface(ScreenId screenId, const ScreenInterface **outInterface) {
+    switch (screenId) {
+        case SCREEN_ID_HOME:
+            *outInterface = homeScreen_getScreenInterface();
+            return true;
+        case SCREEN_ID_MENU:
+            *outInterface = menuScreen_getScreenInterface();
+            return true;
+        case SCREEN_ID_SETTINGS:
+            *outInterface = settingsScreen_getScreenInterface();
+            return true;
+        default:
+            ESP_LOGW(TAG, "No screen interface found for screen ID: %d", screenId);
+            return false;
+    }
+
+    return false;
+}
+
 static void ensureActiveScreenRegistered(const AppState *state) {
     ScreenId activeScreenId = state->sharedState.navigationState.activeScreen;
     const ScreenInterface *activeScreenInterface = registeredScreen.interface;
@@ -83,17 +103,10 @@ static void ensureActiveScreenRegistered(const AppState *state) {
         registeredScreen.interface->deinit();
     }
 
-    switch(activeScreenId) {
-        case SCREEN_ID_HOME:
-            activeScreenInterface = homeScreen_getScreenInterface();
-            break;
-        case SCREEN_ID_MENU:
-            activeScreenInterface = menuScreen_getScreenInterface();
-            break;
-        default:   
-            ESP_LOGW(TAG, "No screen interface found for screen ID: %d! Defaulting to home screen.", activeScreenId);
-            activeScreenId = SCREEN_ID_HOME;
-            activeScreenInterface = homeScreen_getScreenInterface();
+    if (!tryGetScreenInterface(activeScreenId, &activeScreenInterface)) {
+        ESP_LOGE(TAG, "Failed to get screen interface for active screen ID: %d. Defaulting to home screen.", activeScreenId);
+        activeScreenId = SCREEN_ID_HOME;
+        tryGetScreenInterface(activeScreenId, &activeScreenInterface);
     }
 
     registeredScreen = createScreenRegistration(

@@ -17,6 +17,8 @@ typedef enum {
     SCREEN_ID_HOME = 0,
     SCREEN_ID_MENU = 1,
     SCREEN_ID_SETTINGS = 2,
+    SCREEN_ID_WIFI_SETTINGS = 3,
+    SCREEN_ID_DISPLAY_SETTINGS = 4,
 } ScreenId;
 
 typedef struct {
@@ -33,5 +35,18 @@ typedef struct {
 typedef struct {
     DisplayRenderPlan displayRenderPlan;
 } ScreenRenderResult;
+
+typedef struct {
+    char text[16];
+    sFONT *font;
+    ScreenId targetScreenId;
+} MenuItem;
+
+typedef struct {
+    MenuItem items[5];
+    size_t count;
+    int selectedIndex;
+    int activeIndex;
+} MenuState;
 
 #endif // DOG_CRATE_MONITOR_SCREEN_TYPES_H
