@@ -22,7 +22,7 @@ typedef enum {
 } ScreenId;
 
 typedef struct {
-    int screenId;
+    ScreenId screenId;
     ScreenGeneration screenGeneration;
     DisplayRenderPlan displayRenderPlan;
 } DisplayRequest;
@@ -45,8 +45,7 @@ typedef struct {
 typedef struct {
     MenuItem items[5];
     size_t count;
-    int selectedIndex;
-    int activeIndex;
+    ScreenId activeId;
 } MenuState;
 
 #endif // DOG_CRATE_MONITOR_SCREEN_TYPES_H

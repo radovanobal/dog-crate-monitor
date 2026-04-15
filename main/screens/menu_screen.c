@@ -3,14 +3,12 @@
 #include "epaper_port.h"
 
 #include "menu_screen.h"
-#include "../button_event.h"
 #include "../screen_manager.h"
 #include "../screen_types.h"
 #include "../screen_layout.h"
-#include "../screen_render.h"
 #include "../display_types.h"
 #include "../utils/macros.h"
-
+#include "../widgets/list_navigation.h"
 
 static const char *TAG = "menu_screen";
 
@@ -21,30 +19,28 @@ static const struct GridConfig gridConfig = {
     .rows = 1
 };
 
-static DisplayRegionDescriptor displayRegions[] = {
-    [DISPLAY_REGION_MAIN_MENU] = { .id = DISPLAY_REGION_MAIN_MENU },
+static const DisplayRegionId DISPLAY_REGION_MAIN_MENU = 0;
 
+enum {
+    MENU_REGION_SLOT_MAIN_MENU = 0,
 };
 
-static DirtyRegionEntry dirtyDisplayRegions[] = {
-    [DISPLAY_REGION_MAIN_MENU] = { .regionId = DISPLAY_REGION_MAIN_MENU, .isDirty = false },
+static DisplayRegionDescriptor displayRegions[] = {
+    [MENU_REGION_SLOT_MAIN_MENU] = { .id = DISPLAY_REGION_MAIN_MENU },
+
 };
 
 static ScreenLayout screenLayout;
 static MenuState menuState = {0};
 
-static void initDisplay(void);
+static void initDisplay(const AppState *state);
 static void initRenderRegions(void);
-static void initMenuState(void);
+static void initMenuState(const AppState *state);
 static void deinitDisplay(void);
-static void determineDirtyRegions(void);
 static void markActiveMenuItem(const AppState *state);
-static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator);
-static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator);
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state);
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state);
 static ScreenRenderResult evaluateDisplay(const AppState *state);
-static struct PixelCoordinates2D setMenuItemPosition(size_t index);
 
 
 const ScreenInterface *menuScreen_getScreenInterface(void) {
@@ -59,21 +55,21 @@ const ScreenInterface *menuScreen_getScreenInterface(void) {
     return &screenInterface;
 }
 
-static void initDisplay(void) {
+static void initDisplay(const AppState *state) {
     screenLayout = initRenderGrid(gridConfig);
     initRenderRegions();
-    initMenuState();
+    initMenuState(state);
 }
 
 static void initRenderRegions(void)
 {
-    displayRegions[DISPLAY_REGION_MAIN_MENU].gridRegion = (struct GridRegion){ .x = 0, .y = 0, .width = 1, .height = 1 };
+    displayRegions[MENU_REGION_SLOT_MAIN_MENU].gridRegion = (struct GridRegion){ .x = 0, .y = 0, .width = 1, .height = 1 };
 
     const int regionCount = ARRAY_SIZE(displayRegions);
     calculateDisplayRegionsPixelSpace(displayRegions, regionCount, screenLayout);
 }
 
-static void initMenuState(void) {
+static void initMenuState(const AppState *state) {
     menuState = (MenuState){
         .items = {
             [0] = (MenuItem){
@@ -88,9 +84,26 @@ static void initMenuState(void) {
             },
         },
         .count = 2,
-        .selectedIndex = 0,
-        .activeIndex = 0
+        .activeId = state->sharedState.navigationState.activeScreen
     };
+
+    const ListNavigationItem listItems[] = {
+        {
+            .label = menuState.items[0].text,
+            .font = menuState.items[0].font,
+            .id = menuState.items[0].targetScreenId,
+            .isEnabled = true
+        },
+        {
+            .label = menuState.items[1].text,
+            .font = menuState.items[1].font,
+            .id = menuState.items[1].targetScreenId,
+            .isEnabled = true
+        }
+    };
+
+
+    listNavigation_init(listItems, ARRAY_SIZE(listItems), menuState.activeId);
 }
 
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state) {
@@ -104,25 +117,12 @@ static ScreenActionResult handleEvent(const AppEvent *event, const AppState *sta
         return intent;
     }
 
-    switch(event->data.inputEventData.buttonType) {
-        case BUTTON_EVENT_TYPE_ROTARY_ENCODER_UP:
-            menuState.selectedIndex = (menuState.selectedIndex - 1 + menuState.count) % menuState.count;
+    ListNavigationResult navResult = listNavigation_handleInput(event->data.inputEventData);
 
-            break;
-        case BUTTON_EVENT_TYPE_ROTARY_ENCODER_DOWN:
-            menuState.selectedIndex = (menuState.selectedIndex + 1) % menuState.count;
-
-            break;
-        case BUTTON_EVENT_TYPE_ROTARY_ENCODER_PRESS: {
-            ScreenId targetScreenId = menuState.items[menuState.selectedIndex].targetScreenId;
-            intent.screenIntent.intentType = SCREEN_INTENT_TYPE_SCREEN_CHANGE;
-            intent.screenIntent.data.screenId = targetScreenId;
-
-            break;
-        }
-        default:
-            // No action for other buttons, only rotary encoder up/down/press are handled in menu screen
-            break;    
+    if(navResult.actionType == LIST_NAVIGATION_ACTION_SELECTION_CONFIRMED) {
+        ScreenId targetScreenId = navResult.selectedItemId;
+        intent.screenIntent.intentType = SCREEN_INTENT_TYPE_SCREEN_CHANGE;
+        intent.screenIntent.data.screenId = targetScreenId;
     }
 
     return intent;
@@ -132,7 +132,7 @@ static ScreenActionResult handleEvent(const AppEvent *event, const AppState *sta
 static void markActiveMenuItem(const AppState *state) {
     for (size_t i = 0; i < menuState.count; i++) {
         if(menuState.items[i].targetScreenId == state->sharedState.navigationState.activeScreen) {
-            menuState.activeIndex = i;
+            menuState.activeId = menuState.items[i].targetScreenId;
             break;
         }
     }
@@ -140,6 +140,7 @@ static void markActiveMenuItem(const AppState *state) {
 
 static ScreenRenderResult evaluateDisplay(const AppState *state) {
     markActiveMenuItem(state);
+    listNavigation_setActiveItem(state->sharedState.navigationState.lastNonMenuScreen);
     DisplayRenderPlan displayRenderPlan = buildDisplayRenderPlan(state);
 
     return (ScreenRenderResult){
@@ -150,82 +151,13 @@ static ScreenRenderResult evaluateDisplay(const AppState *state) {
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state) {
     DisplayRenderPlan displayRenderPlan = {0};
 
-    determineDirtyRegions();
+    listNavigation_buildRenderPlan(&displayRenderPlan);
 
-    if (!dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty) {
-        return displayRenderPlan;
-    }
-
-    RenderRegionScene menuItemScene = {
-        .regionId = DISPLAY_REGION_MAIN_MENU,
-        .pixelRegion = displayRegions[DISPLAY_REGION_MAIN_MENU].pixelRegion,
-        .renderItems = {{0}},
-        .count = 0
-    };
-
-    for (size_t i = 0; i < menuState.count; i++) {
-        struct PixelCoordinates2D textPosition = setMenuItemPosition(i);
-
-        PixelRenderItem menuItemRenderItem = createTextRenderItem(textPosition, menuState.items[i].text, menuState.items[i].font);
-        menuItemScene.renderItems[menuItemScene.count++] = menuItemRenderItem;
-
-        PixelRenderItem indicatorRenderItem = {0};
-        if (setMenuItemIndicator(i, textPosition, &indicatorRenderItem)) {
-            menuItemScene.renderItems[menuItemScene.count++] = indicatorRenderItem;
-        }
-    }
-    
-    displayRenderPlan.regions[displayRenderPlan.count++] = menuItemScene;
     return displayRenderPlan;
-}
-
-static bool setMenuItemIndicator(size_t index, struct PixelCoordinates2D textPosition, PixelRenderItem *indicator) {
-    if (index == menuState.selectedIndex) {
-        *indicator = createTextUnderlineRenderItem(
-            textPosition, 
-            menuState.items[index].text, 
-            menuState.items[index].font, 
-            DOT_PIXEL_2X2
-        );
-
-        return true;
-    }
-
-    if (index == menuState.activeIndex) {
-        *indicator = createTextUnderlineRenderItem(
-            textPosition, 
-            menuState.items[index].text, 
-            menuState.items[index].font, 
-            DOT_PIXEL_1X1
-        );
-
-        return true;
-    }
-
-    return false;
-}
-
-static struct PixelCoordinates2D setMenuItemPosition(size_t index) {
-    struct PixelCoordinates2D position = calculateAlignedTextPosition(
-        &displayRegions[DISPLAY_REGION_MAIN_MENU], 
-        menuState.items[index].text, 
-        menuState.items[index].font, 
-        REGION_ALIGNMENT_TOP_LEFT
-    );
-
-    position.y += index * (menuState.items[index].font->Height + 10); // Add vertical spacing between items
-
-    return position;
-}
-
-static void determineDirtyRegions(void) {
-    for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
-        dirtyDisplayRegions[i].isDirty = false;
-    }
-
-    dirtyDisplayRegions[DISPLAY_REGION_MAIN_MENU].isDirty = true; // TODO scroll will have to mark this region dirty after first paint
 }
 
 static void deinitDisplay(void) {
     menuState = (MenuState){0};
+
+    listNavigation_deinit();
 }

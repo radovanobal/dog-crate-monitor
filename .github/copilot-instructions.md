@@ -11,6 +11,7 @@
 - I want you to ask me questions about the project, so you can understand it better and give me better instructions.
 - I want you to ask me questions about my knowledge and experience, so you can adjust your instructions to my level.
 - I want you to give me instructions that are clear, concise and easy to follow.
+- When my ideas are bad, don't encourage them and don't just give me the code to implement them, but explain to me why they are bad and what would be a better approach.
 
 #### Documentation
 

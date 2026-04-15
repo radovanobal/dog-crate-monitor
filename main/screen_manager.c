@@ -114,7 +114,7 @@ static void ensureActiveScreenRegistered(const AppState *state) {
         activeScreenInterface
     );
 
-    registeredScreen.interface->init();
+    registeredScreen.interface->init(state);
     registeredScreen.isInitialized = true;
 
     if(shouldUpdateLastDataScreenId(registeredScreen.interface->purpose)) {

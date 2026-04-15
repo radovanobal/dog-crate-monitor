@@ -16,7 +16,7 @@ typedef enum {
 typedef struct {
     ScreenIntentType intentType;
     union {
-        int screenId; // For SCREEN_INTENT_TYPE_SCREEN_CHANGE
+        ScreenId screenId; // For SCREEN_INTENT_TYPE_SCREEN_CHANGE
     } data;
 } ScreenIntent;
 
@@ -26,7 +26,7 @@ typedef struct {
 
 typedef struct {
     ScreenPurpose purpose;
-    void (*init)(void);
+    void (*init)(const AppState *appState);
     void (*deinit)(void);
     ScreenActionResult (*handleEvent)(const AppEvent *event, const AppState *appState);
     ScreenRenderResult (*evaluateDisplay)(const AppState *appState);

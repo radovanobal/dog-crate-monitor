@@ -9,6 +9,7 @@
 #include "../screen_layout.h"
 #include "../screen_render.h"
 #include "../utils/macros.h"
+#include "screen_types.h"
 #include "../screens/home_screen.h"
 
 
@@ -29,6 +30,18 @@ static ScreenLayout screenLayout;
 static HomeScreenState homeScreenState = {0};
 static HomeScreenState nextScreenState = {0};
 
+static const DisplayRegionId DISPLAY_REGION_CLOCK = 0;
+static const DisplayRegionId DISPLAY_REGION_TEMPERATURE = 1;
+static const DisplayRegionId DISPLAY_REGION_HUMIDITY = 2;
+static const DisplayRegionId DISPLAY_REGION_ALERT = 3;
+
+enum {
+    HOME_REGION_SLOT_CLOCK = 0,
+    HOME_REGION_SLOT_TEMPERATURE = 1,
+    HOME_REGION_SLOT_HUMIDITY = 2,
+    HOME_REGION_SLOT_ALERT = 3,
+};
+
 // Define the grid dimensions
 static const struct GridConfig gridConfig = {
     .width = EPD_WIDTH,
@@ -38,27 +51,27 @@ static const struct GridConfig gridConfig = {
 };
 
 static DisplayRegionDescriptor displayRegions[] = {
-    [DISPLAY_REGION_CLOCK] = {  .id = DISPLAY_REGION_CLOCK },
-    [DISPLAY_REGION_TEMPERATURE] = { .id = DISPLAY_REGION_TEMPERATURE },
-    [DISPLAY_REGION_HUMIDITY] = { .id = DISPLAY_REGION_HUMIDITY },
-    [DISPLAY_REGION_ALERT] = { .id = DISPLAY_REGION_ALERT }
+    [HOME_REGION_SLOT_CLOCK] = {  .id = DISPLAY_REGION_CLOCK },
+    [HOME_REGION_SLOT_TEMPERATURE] = { .id = DISPLAY_REGION_TEMPERATURE },
+    [HOME_REGION_SLOT_HUMIDITY] = { .id = DISPLAY_REGION_HUMIDITY },
+    [HOME_REGION_SLOT_ALERT] = { .id = DISPLAY_REGION_ALERT }
 };
 
 static DirtyRegionEntry dirtyDisplayRegions[] = {
-    [DISPLAY_REGION_CLOCK] = { .regionId = DISPLAY_REGION_CLOCK, .isDirty = false },
-    [DISPLAY_REGION_TEMPERATURE] = { .regionId = DISPLAY_REGION_TEMPERATURE, .isDirty = false },
-    [DISPLAY_REGION_HUMIDITY] = { .regionId = DISPLAY_REGION_HUMIDITY, .isDirty = false },
-    [DISPLAY_REGION_ALERT] = { .regionId = DISPLAY_REGION_ALERT, .isDirty = false }
+    [HOME_REGION_SLOT_CLOCK] = { .regionId = DISPLAY_REGION_CLOCK, .isDirty = false },
+    [HOME_REGION_SLOT_TEMPERATURE] = { .regionId = DISPLAY_REGION_TEMPERATURE, .isDirty = false },
+    [HOME_REGION_SLOT_HUMIDITY] = { .regionId = DISPLAY_REGION_HUMIDITY, .isDirty = false },
+    [HOME_REGION_SLOT_ALERT] = { .regionId = DISPLAY_REGION_ALERT, .isDirty = false }
 };
 
 // Log tag
 static const char *TAG = "home_screen";
 
-static void initDisplay(void);
+static void initDisplay(const AppState *state);
 static void initRenderRegions(void);
 static void deinitDisplay(void);
 static void derivedStateFromAppState(const AppState *appState);
-static void determineDirtyRegions(const AppState *appState);
+static void determineDirtyRegions(void);
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState);
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *appState);
 static ScreenRenderResult evaluateDisplay(const AppState *appState);
@@ -79,7 +92,7 @@ const ScreenInterface *homeScreen_getScreenInterface(void) {
     return &screenInterface;
 }
 
-static void initDisplay(void)
+static void initDisplay(const AppState *state)
 {
     ESP_LOGI(TAG, "Initializing display and render regions");
     screenLayout = initRenderGrid(gridConfig);
@@ -104,7 +117,7 @@ static ScreenRenderResult evaluateDisplay(const AppState *appState) {
     nextScreenState.data.relativeHumidity = appState->sharedState.environmentState.relativeHumidity;
 
     derivedStateFromAppState(appState);
-    determineDirtyRegions(appState);
+    determineDirtyRegions();
 
     DisplayRenderPlan displayRenderPlan = buildDisplayRenderPlan(appState);
 
@@ -138,21 +151,21 @@ static void derivedStateFromAppState(const AppState *appState) {
     );
 }
 
-static void determineDirtyRegions() {   
+static void determineDirtyRegions(void) {   
     for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
         dirtyDisplayRegions[i].isDirty = false;
     }
 
     if(!isTimeDateEqual(homeScreenState.data.currentTime, nextScreenState.data.currentTime)) {
-        dirtyDisplayRegions[DISPLAY_REGION_CLOCK].isDirty = strcmp(nextScreenState.derived.clockText, homeScreenState.derived.clockText) != 0;
+        dirtyDisplayRegions[HOME_REGION_SLOT_CLOCK].isDirty = strcmp(nextScreenState.derived.clockText, homeScreenState.derived.clockText) != 0;
     }
 
     if(homeScreenState.data.temperatureC != nextScreenState.data.temperatureC) {
-        dirtyDisplayRegions[DISPLAY_REGION_TEMPERATURE].isDirty = strcmp(nextScreenState.derived.temperatureText, homeScreenState.derived.temperatureText) != 0;
+        dirtyDisplayRegions[HOME_REGION_SLOT_TEMPERATURE].isDirty = strcmp(nextScreenState.derived.temperatureText, homeScreenState.derived.temperatureText) != 0;
     }
 
     if(homeScreenState.data.relativeHumidity != nextScreenState.data.relativeHumidity) {
-        dirtyDisplayRegions[DISPLAY_REGION_HUMIDITY].isDirty = strcmp(nextScreenState.derived.humidityText, homeScreenState.derived.humidityText) != 0;
+        dirtyDisplayRegions[HOME_REGION_SLOT_HUMIDITY].isDirty = strcmp(nextScreenState.derived.humidityText, homeScreenState.derived.humidityText) != 0;
     }
 }
 
@@ -160,11 +173,11 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
     DisplayRenderPlan displayRenderPlan = {0};
     int sceneItemIndex = 0;
 
-    if(dirtyDisplayRegions[DISPLAY_REGION_CLOCK].isDirty) {
+    if(dirtyDisplayRegions[HOME_REGION_SLOT_CLOCK].isDirty) {
 
         RenderRegionScene clockScene = {
             .regionId = DISPLAY_REGION_CLOCK,
-            .pixelRegion = displayRegions[DISPLAY_REGION_CLOCK].pixelRegion,
+            .pixelRegion = displayRegions[HOME_REGION_SLOT_CLOCK].pixelRegion,
             .renderItems = {
                 [0] = createClockRenderItem(appState)
             },
@@ -174,10 +187,10 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
         displayRenderPlan.regions[sceneItemIndex++] = clockScene;
     }
 
-    if(dirtyDisplayRegions[DISPLAY_REGION_TEMPERATURE].isDirty) {
+    if(dirtyDisplayRegions[HOME_REGION_SLOT_TEMPERATURE].isDirty) {
         RenderRegionScene temperatureScene = {
             .regionId = DISPLAY_REGION_TEMPERATURE,
-            .pixelRegion = displayRegions[DISPLAY_REGION_TEMPERATURE].pixelRegion,
+            .pixelRegion = displayRegions[HOME_REGION_SLOT_TEMPERATURE].pixelRegion,
             .renderItems = {
                 [0] = createTemperatureRenderItem(appState)
             },
@@ -186,10 +199,10 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
         displayRenderPlan.regions[sceneItemIndex++] = temperatureScene;
     }
 
-    if(dirtyDisplayRegions[DISPLAY_REGION_HUMIDITY].isDirty) {
+    if(dirtyDisplayRegions[HOME_REGION_SLOT_HUMIDITY].isDirty) {
         RenderRegionScene humidityScene = {
             .regionId = DISPLAY_REGION_HUMIDITY,
-            .pixelRegion = displayRegions[DISPLAY_REGION_HUMIDITY].pixelRegion,
+            .pixelRegion = displayRegions[HOME_REGION_SLOT_HUMIDITY].pixelRegion,
             .renderItems = {
                 [0] = createHumidityRenderItem(appState)
             },
@@ -215,7 +228,7 @@ static bool isTimeDateEqual(TimeDate t1, TimeDate t2) {
 static PixelRenderItem createClockRenderItem(const AppState *appState) {        
     ESP_LOGI(TAG, "Clock text changed from '%s' to '%s'", homeScreenState.derived.clockText, nextScreenState.derived.clockText);
 
-    struct PixelCoordinates2D clockTextPosition = calculateAlignedTextPosition(&displayRegions[DISPLAY_REGION_CLOCK], nextScreenState.derived.clockText, &Font18, REGION_ALIGNMENT_TOP_RIGHT);
+    struct PixelCoordinates2D clockTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.clockText, &Font18, REGION_ALIGNMENT_TOP_RIGHT);
     PixelRenderItem renderItem = createTextRenderItem(clockTextPosition, nextScreenState.derived.clockText, &Font18);
 
     return renderItem;
@@ -224,7 +237,7 @@ static PixelRenderItem createClockRenderItem(const AppState *appState) {
 static PixelRenderItem createTemperatureRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Temperature text changed from '%s' to '%s'", homeScreenState.derived.temperatureText, nextScreenState.derived.temperatureText);
 
-    struct PixelCoordinates2D temperatureTextPosition = calculateAlignedTextPosition(&displayRegions[DISPLAY_REGION_TEMPERATURE], nextScreenState.derived.temperatureText, &Font48, REGION_ALIGNMENT_CENTER);
+    struct PixelCoordinates2D temperatureTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_TEMPERATURE], nextScreenState.derived.temperatureText, &Font48, REGION_ALIGNMENT_CENTER);
     PixelRenderItem renderItem = createTextRenderItem(temperatureTextPosition, nextScreenState.derived.temperatureText, &Font48);
 
     return renderItem;
@@ -233,7 +246,7 @@ static PixelRenderItem createTemperatureRenderItem(const AppState *appState) {
 static PixelRenderItem createHumidityRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Humidity text changed from '%s' to '%s'", homeScreenState.derived.humidityText, nextScreenState.derived.humidityText);
 
-    struct PixelCoordinates2D humidityTextPosition = calculateAlignedTextPosition(&displayRegions[DISPLAY_REGION_HUMIDITY], nextScreenState.derived.humidityText, &Font16, REGION_ALIGNMENT_TOP_CENTER);
+    struct PixelCoordinates2D humidityTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_HUMIDITY], nextScreenState.derived.humidityText, &Font16, REGION_ALIGNMENT_TOP_CENTER);
     PixelRenderItem renderItem = createTextRenderItem(humidityTextPosition, nextScreenState.derived.humidityText, &Font16);
 
     return renderItem;
@@ -241,10 +254,10 @@ static PixelRenderItem createHumidityRenderItem(const AppState *appState) {
 
 static void initRenderRegions(void)
 {
-    displayRegions[DISPLAY_REGION_CLOCK].gridRegion = (struct GridRegion){ .x = 4, .y = 0, .width = 1, .height = 1 };
-    displayRegions[DISPLAY_REGION_TEMPERATURE].gridRegion = (struct GridRegion){ .x = 1, .y = 1, .width = 3, .height = 2 };
-    displayRegions[DISPLAY_REGION_HUMIDITY].gridRegion = (struct GridRegion){ .x = 1, .y = 3, .width = 3, .height = 1 };
-    displayRegions[DISPLAY_REGION_ALERT].gridRegion = (struct GridRegion){.x = 0, .y = 1, .width = 1, .height = 2};
+    displayRegions[HOME_REGION_SLOT_CLOCK].gridRegion = (struct GridRegion){ .x = 4, .y = 0, .width = 1, .height = 1 };
+    displayRegions[HOME_REGION_SLOT_TEMPERATURE].gridRegion = (struct GridRegion){ .x = 1, .y = 1, .width = 3, .height = 2 };
+    displayRegions[HOME_REGION_SLOT_HUMIDITY].gridRegion = (struct GridRegion){ .x = 1, .y = 3, .width = 3, .height = 1 };
+    displayRegions[HOME_REGION_SLOT_ALERT].gridRegion = (struct GridRegion){.x = 0, .y = 1, .width = 1, .height = 2};
 
     const int regionCount = ARRAY_SIZE(displayRegions);
     calculateDisplayRegionsPixelSpace(displayRegions, regionCount, screenLayout);
@@ -253,14 +266,6 @@ static void initRenderRegions(void)
 static void deinitDisplay(void) {
     homeScreenState = (HomeScreenState){0};
     nextScreenState = (HomeScreenState){0};
-
-    for (size_t i = 0; i < ARRAY_SIZE(dirtyDisplayRegions); i++) {
-        dirtyDisplayRegions[i].isDirty = false;
-    }
-
-    for (size_t i = 0; i < ARRAY_SIZE(displayRegions); i++) {
-        displayRegions[i].pixelRegion = (PixelRegion){0};
-    }
 
     ESP_LOGI(TAG, "Display deinitialized and state reset");
 }

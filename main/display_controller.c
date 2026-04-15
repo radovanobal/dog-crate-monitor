@@ -95,16 +95,17 @@ static void updateRenderPlanCache(const DisplayRenderPlan *newPlan) {
         const RenderRegionScene planScene = newPlan->regions[i];
         const int cachedIndex = findCachedSceneIndexByRegionId(planScene.regionId);
 
+        if (cachedIndex >= 0) {
+            cacheRenderPlan.scenes[cachedIndex] = planScene;
+            continue;
+        }
+
         if (cacheRenderPlan.count >= MAX_RENDER_SCENES) {
             ESP_LOGW(TAG, "Render scene cache is full. Cannot cache new scene with region ID: %d", planScene.regionId);
             return;
         }
 
-        if (cachedIndex < 0) {
-            cacheRenderPlan.scenes[cacheRenderPlan.count++] = planScene;
-        } else {
-            cacheRenderPlan.scenes[cachedIndex] = planScene;
-        }
+        cacheRenderPlan.scenes[cacheRenderPlan.count++] = planScene;
     }
 }
 
