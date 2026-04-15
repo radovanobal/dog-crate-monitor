@@ -9,7 +9,7 @@
 void appDispatcher_init();
 void appDispatcher_dispatchEvent(const AppEvent *event);
 void appDispatcher_applyScreenIntent(const ScreenIntent *intent);
-void appDispatcher_handleEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, TimeDate currentTime);
+void appDispatcher_handleEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, int batteryLevel, TimeDate currentTime);
 const AppState *appDispatcher_getAppState();
 
 #endif // DOG_CRATE_MONITOR_APP_DISPATCHER_H

@@ -18,11 +18,13 @@ typedef struct {
         TimeDate currentTime;
         float temperatureC;
         float relativeHumidity;
+        int batteryLevel;
     } data;
     struct {
         char clockText[16];
         char temperatureText[16];
         char humidityText[16];
+        char batteryLevelText[16];
     } derived;
 } HomeScreenState;
 
@@ -79,6 +81,7 @@ static bool isTimeDateEqual(TimeDate t1, TimeDate t2);
 static PixelRenderItem createClockRenderItem(const AppState *appState);
 static PixelRenderItem createTemperatureRenderItem(const AppState *appState);
 static PixelRenderItem createHumidityRenderItem(const AppState *appState);
+static PixelRenderItem createBatteryLevelRenderItem(const AppState *appState);
 
 const ScreenInterface *homeScreen_getScreenInterface(void) {
     static const ScreenInterface screenInterface = {
@@ -149,6 +152,13 @@ static void derivedStateFromAppState(const AppState *appState) {
         "%.1f%%", 
         appState->sharedState.environmentState.relativeHumidity
     );
+
+    snprintf(
+        nextScreenState.derived.batteryLevelText,
+        sizeof(nextScreenState.derived.batteryLevelText),
+        "%3d%%",
+        appState->sharedState.environmentState.batteryLevel
+    );
 }
 
 static void determineDirtyRegions(void) {   
@@ -167,6 +177,10 @@ static void determineDirtyRegions(void) {
     if(homeScreenState.data.relativeHumidity != nextScreenState.data.relativeHumidity) {
         dirtyDisplayRegions[HOME_REGION_SLOT_HUMIDITY].isDirty = strcmp(nextScreenState.derived.humidityText, homeScreenState.derived.humidityText) != 0;
     }
+
+    if(homeScreenState.data.batteryLevel != nextScreenState.data.batteryLevel) {
+        dirtyDisplayRegions[HOME_REGION_SLOT_CLOCK].isDirty = strcmp(nextScreenState.derived.batteryLevelText, homeScreenState.derived.batteryLevelText) != 0;
+    }
 }
 
 static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
@@ -179,9 +193,10 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             .regionId = DISPLAY_REGION_CLOCK,
             .pixelRegion = displayRegions[HOME_REGION_SLOT_CLOCK].pixelRegion,
             .renderItems = {
-                [0] = createClockRenderItem(appState)
+                [0] = createClockRenderItem(appState),
+                [1] = createBatteryLevelRenderItem(appState)
             },
-            .count = 1
+            .count = 2
         };
 
         displayRenderPlan.regions[sceneItemIndex++] = clockScene;
@@ -234,6 +249,16 @@ static PixelRenderItem createClockRenderItem(const AppState *appState) {
     return renderItem;
 }
 
+
+static PixelRenderItem createBatteryLevelRenderItem(const AppState *appState) {        
+    ESP_LOGI(TAG, "Battery level changed from '%s' to '%s'", homeScreenState.derived.batteryLevelText, nextScreenState.derived.batteryLevelText);
+
+    struct PixelCoordinates2D batteryLevelTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.batteryLevelText, &Font18, REGION_ALIGNMENT_TOP_LEFT);
+    PixelRenderItem renderItem = createTextRenderItem(batteryLevelTextPosition, nextScreenState.derived.batteryLevelText, &Font18);
+
+    return renderItem;
+}
+
 static PixelRenderItem createTemperatureRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Temperature text changed from '%s' to '%s'", homeScreenState.derived.temperatureText, nextScreenState.derived.temperatureText);
 
@@ -254,10 +279,10 @@ static PixelRenderItem createHumidityRenderItem(const AppState *appState) {
 
 static void initRenderRegions(void)
 {
-    displayRegions[HOME_REGION_SLOT_CLOCK].gridRegion = (struct GridRegion){ .x = 4, .y = 0, .width = 1, .height = 1 };
+    displayRegions[HOME_REGION_SLOT_CLOCK].gridRegion = (struct GridRegion){ .x = 0, .y = 0, .width = 5, .height = 1 };
     displayRegions[HOME_REGION_SLOT_TEMPERATURE].gridRegion = (struct GridRegion){ .x = 1, .y = 1, .width = 3, .height = 2 };
     displayRegions[HOME_REGION_SLOT_HUMIDITY].gridRegion = (struct GridRegion){ .x = 1, .y = 3, .width = 3, .height = 1 };
-    displayRegions[HOME_REGION_SLOT_ALERT].gridRegion = (struct GridRegion){.x = 0, .y = 1, .width = 1, .height = 2};
+    displayRegions[HOME_REGION_SLOT_ALERT].gridRegion = (struct GridRegion){.x = 1, .y = 1, .width = 1, .height = 2};
 
     const int regionCount = ARRAY_SIZE(displayRegions);
     calculateDisplayRegionsPixelSpace(displayRegions, regionCount, screenLayout);

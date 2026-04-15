@@ -8,6 +8,7 @@ typedef struct {
     TimeDate currentTime;
     float temperatureC;
     float relativeHumidity;
+    int batteryLevel;
 } EnvironmentState;
 
 typedef struct {
@@ -26,7 +27,13 @@ typedef struct {
 } AppState;
 
 void appStore_initAppState(AppState *appState);
-void appStore_updateEnvironmentState(AppState *appState, float temperatureC, float relativeHumidity, TimeDate currentTime);
+void appStore_updateEnvironmentState(
+    AppState *appState, 
+    float temperatureC, 
+    float relativeHumidity, 
+    int batteryLevel, 
+    TimeDate currentTime
+);
 void appStore_updateNavigationState(AppState *appState, ScreenId activeScreen);
 
 #endif // DOG_CRATE_MONITOR_APP_STORE_H

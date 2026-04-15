@@ -18,6 +18,7 @@ static void initEnvironment(AppState *appState) {
     appState->sharedState.environmentState.temperatureC = 0.0f;
     appState->sharedState.environmentState.relativeHumidity = 0.0f;
     appState->sharedState.environmentState.currentTime = (TimeDate){0};
+    appState->sharedState.environmentState.batteryLevel = 0.0f;
 }
 
 static void initScreenState(AppState *appState) {
@@ -25,10 +26,11 @@ static void initScreenState(AppState *appState) {
     appState->sharedState.navigationState.screenGeneration = 1;
 }
 
-void appStore_updateEnvironmentState(AppState *appState, float temperatureC, float relativeHumidity, TimeDate currentTime) {
+void appStore_updateEnvironmentState(AppState *appState, float temperatureC, float relativeHumidity, int batteryLevel, TimeDate currentTime) {
     appState->sharedState.environmentState.temperatureC = temperatureC;
     appState->sharedState.environmentState.relativeHumidity = relativeHumidity;
     appState->sharedState.environmentState.currentTime = currentTime;
+    appState->sharedState.environmentState.batteryLevel = batteryLevel;
 }
 
 void appStore_updateNavigationState(AppState *appState, ScreenId activeScreen) {

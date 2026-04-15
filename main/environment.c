@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "shtc3_bsp.h"
 #include "pcf85063_bsp.h"
+#include "axp_prot.h"
 
 #include "./environment_types.h"
 #include "./environment.h"
@@ -29,6 +30,7 @@ enum env_error initEnvironment(void)
     }
 
     PCF85063_init();
+    axp_init();
 
     return ENV_SUCCESS;
 }
@@ -56,6 +58,19 @@ enum env_error readTemperatureAndHumidity(float *stateTemperatureC, float *state
     readTryCount = 0;
     cacheTemperatureC = *stateTemperatureC;
     cacheRelativeHumidity = *stateRelativeHumidity;
+
+    return ENV_SUCCESS;
+}
+
+enum env_error getBatteryLevel(int *batteryLevel) {
+    const int batteryPercent = get_battery_power();
+
+    if (batteryPercent < 0 || batteryPercent > 100) {
+        ESP_LOGE(TAG, "Failed to read battery percentage from AXP2101 PMU!");
+        return ENV_FAIL;
+    }
+
+    *batteryLevel = batteryPercent;
 
     return ENV_SUCCESS;
 }

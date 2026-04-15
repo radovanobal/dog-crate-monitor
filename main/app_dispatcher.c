@@ -13,6 +13,7 @@ void appDispatcher_dispatchEvent(const AppEvent *event) {
             appDispatcher_handleEnvironmentUpdateEvent(
                 event->data.environmentUpdateData.temperatureC, 
                 event->data.environmentUpdateData.relativeHumidity, 
+                event->data.environmentUpdateData.batteryLevel,
                 event->data.environmentUpdateData.currentTime
             );
             break;
@@ -25,8 +26,8 @@ void appDispatcher_dispatchEvent(const AppEvent *event) {
 }
 
 
-void appDispatcher_handleEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, TimeDate currentTime) {
-    appStore_updateEnvironmentState(&appState, temperatureC, relativeHumidity, currentTime);
+void appDispatcher_handleEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, int batteryLevel, TimeDate currentTime) {
+    appStore_updateEnvironmentState(&appState, temperatureC, relativeHumidity, batteryLevel, currentTime);
 }
 
 void appDispatcher_applyScreenIntent(const ScreenIntent *intent) {

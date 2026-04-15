@@ -179,6 +179,7 @@ void serviceTask(void *pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     float stateTemperatureC;
     float stateRelativeHumidity;
+    int batteryLevel;
     TimeDate currentTime;
 
     ESP_LOGI(TAG, "Service Task started");
@@ -186,7 +187,8 @@ void serviceTask(void *pvParameters) {
     for(;;) {
         enum env_error envStatus = readTemperatureAndHumidity(&stateTemperatureC, &stateRelativeHumidity);
         enum env_error timeStatus = getCurrentTime(&currentTime);
-        enum env_error overallStatus = max(envStatus, timeStatus);
+        enum env_error batteryStatus = getBatteryLevel(&batteryLevel);
+        enum env_error overallStatus = max(max(envStatus, timeStatus), batteryStatus);
         int delayDuration = 15000; // Default to 15 seconds
 
         if (overallStatus == ENV_FAIL) {
@@ -200,7 +202,7 @@ void serviceTask(void *pvParameters) {
             ESP_LOGW(TAG, "Environment data or time is in warning state");
         }
 
-        AppEvent environmentEvent = appEvent_createEnvironmentUpdateEvent(stateTemperatureC, stateRelativeHumidity, currentTime);
+        AppEvent environmentEvent = appEvent_createEnvironmentUpdateEvent(stateTemperatureC, stateRelativeHumidity, batteryLevel, currentTime);
         
         if(xQueueSend(appEventQueue, &environmentEvent, pdMS_TO_TICKS(10)) != pdTRUE) {
             ESP_LOGW(TAG, "Failed to send environment event to queue");

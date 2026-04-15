@@ -3,5 +3,5 @@ idf_component_register(SRCS "screen_manager.c" "task_manager.c" "utils.c" "main.
                     "button_event.c" "screen_manager.c" "screens/home_screen.c" "screens/menu_screen.c"
                     "display_controller.c" "screen_layout.c" "screen_render.c" "screens/settings_screen.c"
                     "widgets/list_navigation.c"
-                    INCLUDE_DIRS "." PRIV_REQUIRES epaper_port shtc3_bsp pcf85063_bsp i2c_bsp button_bsp)
+                    INCLUDE_DIRS "." PRIV_REQUIRES epaper_port shtc3_bsp pcf85063_bsp i2c_bsp button_bsp axpPower)
 

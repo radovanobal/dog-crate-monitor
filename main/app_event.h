@@ -12,6 +12,7 @@ typedef enum {
 typedef struct {
     float temperatureC;
     float relativeHumidity;
+    int batteryLevel;
     TimeDate currentTime;
 } EnvironmentUpdateData;
 
@@ -28,7 +29,7 @@ typedef struct {
     } data;
 } AppEvent;
 
-AppEvent appEvent_createEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, TimeDate currentTime);
+AppEvent appEvent_createEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, int batteryLevel, TimeDate currentTime);
 AppEvent appEvent_createInputEvent(ButtonType buttonType, ButtonPressType pressType);
 
 #endif // DOG_CRATE_MONITOR_APP_EVENT_H
