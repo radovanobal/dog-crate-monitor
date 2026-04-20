@@ -52,7 +52,7 @@ static const char *TAG = "display_controller";
 static RenderSceneCache cacheRenderPlan = {0};
 static RegionRefreshStateCache regionRefreshStateCache = {0};
 static uint8_t *ImageMonoBuffer;
-static const int maxPartialRenderCount = 3;
+static const int maxPartialRenderCount = 50;
 static ScreenGeneration lastRenderedScreenGeneration = 0;
 
 display_init_error displayController_init(void) {
