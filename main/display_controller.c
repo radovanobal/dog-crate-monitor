@@ -7,7 +7,6 @@
 #include "./display_controller.h"
 #include "./display_types.h"
 #include "./screen_types.h"
-#include "utils/macros.h"
 
 typedef struct {
     RenderRegionScene scenes[MAX_RENDER_SCENES];
@@ -175,19 +174,30 @@ static bool doesScenePlanMatchCache(const DisplayRenderPlan *incomingPlan) {
     return true;
 }
 
-static void renderRegionPaintCountIncrement(const RenderRegionScene *scene) {
+static int renderRegionPaintCountIncrement(const RenderRegionScene *scene) {
     const int regionStateIndex = findRenderCountSceneIndexByRegionId(scene->regionId);
 
-    if (regionStateIndex < 0) {
-        regionRefreshStateCache.states[regionRefreshStateCache.count++] = (RegionRefreshState){ 
-            .regionId = scene->regionId, 
-            .regionPaintCount = 1 
-        };
-
-        return;
+    if (regionStateIndex >= 0) {
+        regionRefreshStateCache.states[regionStateIndex].regionPaintCount++;
+        return regionStateIndex;
     }
 
-    regionRefreshStateCache.states[regionStateIndex].regionPaintCount++;
+    if (regionRefreshStateCache.count >= MAX_RENDER_SCENES) {
+        ESP_LOGW(
+            TAG,
+            "Region refresh state cache is full (%u). Skipping paint count tracking for region %u.",
+            (unsigned)MAX_RENDER_SCENES,
+            (unsigned)scene->regionId
+        );
+        return -1;
+    }
+
+    regionRefreshStateCache.states[regionRefreshStateCache.count++] = (RegionRefreshState){ 
+        .regionId = scene->regionId, 
+        .regionPaintCount = 1 
+    };
+
+    return regionRefreshStateCache.count - 1;
 }
 
 static bool doesRenderRegionSceneEquals(const RenderRegionScene *left, const RenderRegionScene *right) {
@@ -385,7 +395,10 @@ static void partialRenderToDisplay(const DisplayRenderPlan *displayRenderPlan) {
     }
 
     RegionRecoveryPlan recoveryPlan = determineRegionsForRecovery(displayRenderPlan);
-    recoverRegions(&recoveryPlan);
+    if (recoveryPlan.count > 0) {
+        ESP_LOGI(TAG, "Recovering %u regions before partial render", (unsigned)recoveryPlan.count);
+        recoverRegions(&recoveryPlan);
+    }
 
     Paint_NewImage(ImageMonoBuffer, EPD_WIDTH, EPD_HEIGHT, ROTATE_0, WHITE);
     Paint_SelectImage(ImageMonoBuffer);
@@ -426,16 +439,25 @@ static RegionRecoveryPlan determineRegionsForRecovery(const DisplayRenderPlan *d
     
     for (size_t i = 0; i < displayRenderPlan->count; i++) {
         const RenderRegionScene *scene = &displayRenderPlan->regions[i];
-        renderRegionPaintCountIncrement(scene);
+        const int regionStateIndex =renderRegionPaintCountIncrement(scene);
 
-        if (regionRefreshStateCache.states[i].regionPaintCount >= maxPartialRenderCount) {
+        if (recoveryPlan.count >= MAX_RENDER_SCENES) {
+            ESP_LOGW(TAG,
+                "Recovery plan full (%u). Breaking recovery plan generation.",
+                (unsigned)MAX_RENDER_SCENES
+            );
+
+            break;
+        }
+
+        if (regionStateIndex >= 0 && regionRefreshStateCache.states[regionStateIndex].regionPaintCount >= maxPartialRenderCount) {
             ESP_LOGI(TAG, "Region ID %d has been painted %u times. Marking for full refresh.",
-                regionRefreshStateCache.states[i].regionId,
-                (unsigned)regionRefreshStateCache.states[i].regionPaintCount
+                regionRefreshStateCache.states[regionStateIndex].regionId,
+                (unsigned)regionRefreshStateCache.states[regionStateIndex].regionPaintCount
             );
 
             recoveryPlan.scenes[recoveryPlan.count++] = scene;
-            regionRefreshStateCache.states[i].regionPaintCount = 0;
+            regionRefreshStateCache.states[regionStateIndex].regionPaintCount = 0;
         }
     }
 
