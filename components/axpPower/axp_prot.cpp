@@ -99,7 +99,7 @@ void axp_init(void)
 
     /* Charge the VBAT */
     axp2101.setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_50MA); // Precharging current
-    axp2101.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_200MA);//Constant current charging current directly affects the charging speed
+    axp2101.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_700MA);//Constant current charging current directly affects the charging speed
     axp2101.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);//Charging termination current
 
     /* Set the cut-off voltage for battery charging */

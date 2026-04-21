@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "GUI_Paint.h"
+#include "generated_icons.h"
 
 #define MAX_RENDER_ITEMS_PER_REGION 4
 #define MAX_RENDER_SCENES 8
@@ -70,6 +71,7 @@ typedef enum {
     RENDER_ITEM_TYPE_BITMAP = 2,
     RENDER_ITEM_TYPE_RECT = 3,
     RENDER_ITEM_TYPE_LINE = 4,
+    RENDER_ITEM_TYPE_ICON = 5,
 } RenderItemType;
 
 typedef struct {
@@ -85,6 +87,11 @@ typedef struct {
             const unsigned char *imageData;
             struct PixelSize2D size;
         } bitmap;
+        struct {
+            struct PixelCoordinates2D position;
+            IconId iconId;
+            uint16_t color;
+        } icon;
         struct {
             struct PixelCoordinates2D position;
             struct PixelSize2D size;
