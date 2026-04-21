@@ -1,3 +1,4 @@
+#include "GUI_Paint.h"
 #include "esp_log.h"
 #include "epaper_port.h"
 

@@ -374,22 +374,7 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
         default:
             ESP_LOGW(TAG, "Unknown render item type: %d", item->type);
     }
-}
 
-static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color) {
-    const uint16_t bytesPerRow = icon->bytesPerRow;
-
-    for (uint16_t row = 0; row < icon->height; ++row) {
-        for (uint16_t col = 0; col < icon->width; ++col) {
-            const uint16_t byteIndex = row * bytesPerRow + col / 8;
-            const uint8_t bitMask = (uint8_t)(0x80 >> (col % 8));
-            const bool pixelOn = (icon->bitmap[byteIndex] & bitMask) != 0;
-
-            if (pixelOn) {
-                Paint_SetPixel(position.x + col, position.y + row, color);
-            }
-        }
-    }
 }
 
 static void fullRenderToDisplay(void) {
