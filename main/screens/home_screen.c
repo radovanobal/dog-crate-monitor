@@ -1,3 +1,4 @@
+#include "GUI_Paint.h"
 #include "esp_log.h"
 #include "epaper_port.h"
 
@@ -11,7 +12,7 @@
 #include "../utils/macros.h"
 #include "screen_types.h"
 #include "../screens/home_screen.h"
-
+#include "../generated_icons.h"
 
 typedef struct {
     struct {
@@ -82,6 +83,11 @@ static PixelRenderItem createClockRenderItem(const AppState *appState);
 static PixelRenderItem createTemperatureRenderItem(const AppState *appState);
 static PixelRenderItem createHumidityRenderItem(const AppState *appState);
 static PixelRenderItem createBatteryLevelRenderItem(const AppState *appState);
+static PixelRenderItem createTemperatureIconRenderItem(const AppState *appState);
+static PixelRenderItem createHumidityIconRenderItem(const AppState *appState);
+static PixelRenderItem createBatteryIconRenderItem(const AppState *appState);
+static IconId selectTemperatureIcon(float temperatureC);
+static IconId selectBatteryIcon(int batteryLevel);
 
 const ScreenInterface *homeScreen_getScreenInterface(void) {
     static const ScreenInterface screenInterface = {
@@ -118,6 +124,7 @@ static ScreenRenderResult evaluateDisplay(const AppState *appState) {
     nextScreenState.data.currentTime = appState->sharedState.environmentState.currentTime;
     nextScreenState.data.temperatureC = appState->sharedState.environmentState.temperatureC;
     nextScreenState.data.relativeHumidity = appState->sharedState.environmentState.relativeHumidity;
+    nextScreenState.data.batteryLevel = appState->sharedState.environmentState.batteryLevel;
 
     derivedStateFromAppState(appState);
     determineDirtyRegions();
@@ -194,9 +201,10 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             .pixelRegion = displayRegions[HOME_REGION_SLOT_CLOCK].pixelRegion,
             .renderItems = {
                 [0] = createClockRenderItem(appState),
-                [1] = createBatteryLevelRenderItem(appState)
+                [1] = createBatteryLevelRenderItem(appState),
+                [2] = createBatteryIconRenderItem(appState)
             },
-            .count = 2
+            .count = 3
         };
 
         displayRenderPlan.regions[sceneItemIndex++] = clockScene;
@@ -207,9 +215,10 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             .regionId = DISPLAY_REGION_TEMPERATURE,
             .pixelRegion = displayRegions[HOME_REGION_SLOT_TEMPERATURE].pixelRegion,
             .renderItems = {
-                [0] = createTemperatureRenderItem(appState)
+                [0] = createTemperatureRenderItem(appState),
+                [1] = createTemperatureIconRenderItem(appState)
             },
-            .count = 1
+            .count = 2
         };
         displayRenderPlan.regions[sceneItemIndex++] = temperatureScene;
     }
@@ -219,9 +228,10 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             .regionId = DISPLAY_REGION_HUMIDITY,
             .pixelRegion = displayRegions[HOME_REGION_SLOT_HUMIDITY].pixelRegion,
             .renderItems = {
-                [0] = createHumidityRenderItem(appState)
+                [0] = createHumidityRenderItem(appState),
+                [1] = createHumidityIconRenderItem(appState)
             },
-            .count = 1
+            .count = 2
         };
         displayRenderPlan.regions[sceneItemIndex++] = humidityScene;
     }
@@ -244,6 +254,9 @@ static PixelRenderItem createClockRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Clock text changed from '%s' to '%s'", homeScreenState.derived.clockText, nextScreenState.derived.clockText);
 
     struct PixelCoordinates2D clockTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.clockText, &Font18, REGION_ALIGNMENT_TOP_RIGHT);
+    clockTextPosition.x -= 8; // Padding from the right edge of the region
+    clockTextPosition.y += 8; // Padding from the top edge of the region
+
     PixelRenderItem renderItem = createTextRenderItem(clockTextPosition, nextScreenState.derived.clockText, &Font18);
 
     return renderItem;
@@ -253,8 +266,10 @@ static PixelRenderItem createClockRenderItem(const AppState *appState) {
 static PixelRenderItem createBatteryLevelRenderItem(const AppState *appState) {        
     ESP_LOGI(TAG, "Battery level changed from '%s' to '%s'", homeScreenState.derived.batteryLevelText, nextScreenState.derived.batteryLevelText);
 
-    struct PixelCoordinates2D batteryLevelTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.batteryLevelText, &Font18, REGION_ALIGNMENT_TOP_LEFT);
-    PixelRenderItem renderItem = createTextRenderItem(batteryLevelTextPosition, nextScreenState.derived.batteryLevelText, &Font18);
+    struct PixelCoordinates2D batteryLevelTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.batteryLevelText, &Font12, REGION_ALIGNMENT_TOP_LEFT);
+    batteryLevelTextPosition.x += 48; // Adjust text position to be right of the battery icon
+    batteryLevelTextPosition.y += 8; // Padding from the top edge of the region
+    PixelRenderItem renderItem = createTextRenderItem(batteryLevelTextPosition, nextScreenState.derived.batteryLevelText, &Font12);
 
     return renderItem;
 }
@@ -268,6 +283,26 @@ static PixelRenderItem createTemperatureRenderItem(const AppState *appState) {
     return renderItem;
 }
 
+static PixelRenderItem createTemperatureIconRenderItem(const AppState *appState) {
+    struct PixelCoordinates2D iconPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_TEMPERATURE], nextScreenState.derived.temperatureText, &Font48, REGION_ALIGNMENT_CENTER);
+    iconPosition.x -= 48; // Adjust icon position to be left of the temperature text
+    iconPosition.y += 16; // Adjust icon position to be vertically centered with the temperature text
+
+    PixelRenderItem renderItem = createIconBitmapRenderItem(iconPosition, selectTemperatureIcon(nextScreenState.data.temperatureC), BLACK);
+
+    return renderItem;
+}
+
+static PixelRenderItem createHumidityIconRenderItem(const AppState *appState) {
+    struct PixelCoordinates2D iconPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_HUMIDITY], nextScreenState.derived.humidityText, &Font16, REGION_ALIGNMENT_TOP_CENTER);
+    iconPosition.x -= 18; // Adjust icon position to be left of the humidity text
+    iconPosition.y += 4; // Adjust icon position to be vertically centered with the humidity text
+
+    PixelRenderItem renderItem = createIconBitmapRenderItem(iconPosition, ICON_TINT_E80B_24, BLACK);
+
+    return renderItem;
+}
+
 static PixelRenderItem createHumidityRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Humidity text changed from '%s' to '%s'", homeScreenState.derived.humidityText, nextScreenState.derived.humidityText);
 
@@ -275,6 +310,56 @@ static PixelRenderItem createHumidityRenderItem(const AppState *appState) {
     PixelRenderItem renderItem = createTextRenderItem(humidityTextPosition, nextScreenState.derived.humidityText, &Font16);
 
     return renderItem;
+}
+
+static PixelRenderItem createBatteryIconRenderItem(const AppState *appState) {
+    ESP_LOGI(TAG, "Battery icon changed from '%s' to '%s'", homeScreenState.derived.batteryLevelText, nextScreenState.derived.batteryLevelText);
+
+    struct PixelCoordinates2D batteryIconPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.batteryLevelText, &Font12, REGION_ALIGNMENT_TOP_LEFT);
+    batteryIconPosition.x += 8; // Padding from the left edge of the region
+    batteryIconPosition.y += 8; // Padding from the top edge of the region
+
+    PixelRenderItem renderItem = createIconBitmapRenderItem(batteryIconPosition, selectBatteryIcon(nextScreenState.data.batteryLevel), BLACK);
+
+    return renderItem;
+}
+
+static IconId selectTemperatureIcon(float temperatureC) {
+    if (temperatureC <= 5.0) {
+        ESP_LOGI(TAG, "Temperature icon selected for temperature: %f, Very Low", temperatureC);
+        return ICON_THERMOMETER_0_F2CB_48;
+    } else if (temperatureC <= 15.0) {
+        ESP_LOGI(TAG, "Temperature icon selected for temperature: %f, Low", temperatureC);
+        return ICON_THERMOMETER_QUARTER_F2CA_48;
+    } else if (temperatureC <= 24.0) {
+        ESP_LOGI(TAG, "Temperature icon selected for temperature: %f, Moderate", temperatureC);
+        return ICON_THERMOMETER_2_F2C9_48;
+    } else if (temperatureC <= 27.0) {
+        ESP_LOGI(TAG, "Temperature icon selected for temperature: %f, High", temperatureC);
+        return ICON_THERMOMETER_3_F2C8_48;
+    } else {
+        ESP_LOGI(TAG, "Temperature icon selected for temperature: %f, Very High", temperatureC);
+        return ICON_THERMOMETER_F2C7_48;
+    }
+}
+
+static IconId selectBatteryIcon(int batteryLevel) {
+    if (batteryLevel >= 80) {
+        ESP_LOGI(TAG, "Battery icon selected for battery level: %d, Full", batteryLevel);
+        return ICON_BATTERY_4_F240_24;
+    } else if (batteryLevel >= 60) {
+        ESP_LOGI(TAG, "Battery icon selected for battery level: %d, High", batteryLevel);
+        return ICON_BATTERY_3_F241_24;
+    } else if (batteryLevel >= 40) {
+        ESP_LOGI(TAG, "Battery icon selected for battery level: %d, Medium", batteryLevel);
+        return ICON_BATTERY_2_F242_24;
+    } else if (batteryLevel >= 20) {
+        ESP_LOGI(TAG, "Battery icon selected for battery level: %d, Low", batteryLevel);
+        return ICON_BATTERY_1_F243_24;
+    } else {
+        ESP_LOGI(TAG, "Battery icon selected for battery level: %d, Very Low", batteryLevel);
+        return ICON_BATTERY_0_F244_24;
+    }
 }
 
 static void initRenderRegions(void)

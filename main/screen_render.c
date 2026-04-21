@@ -2,6 +2,7 @@
 
 #include "screen_render.h"
 #include "display_types.h"
+#include "generated_icons.h"
 
 PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font) {
     PixelRenderItem renderItem = (PixelRenderItem){
@@ -51,6 +52,20 @@ PixelRenderItem createLineSeparatorRenderItem(struct PixelCoordinates2D start, s
                 .color = GRAY2, // Gray
                 .thickness = DOT_PIXEL_1X1,
                 .style = LINE_STYLE_SOLID  
+            }
+        }
+    };
+    return renderItem;
+}
+
+PixelRenderItem createIconBitmapRenderItem(struct PixelCoordinates2D position, IconId iconId, uint16_t color) {
+    PixelRenderItem renderItem = (PixelRenderItem) {
+        .type = RENDER_ITEM_TYPE_ICON,
+        .data = {
+            .icon = {
+                .position = position,
+                .iconId = iconId,
+                .color = color
             }
         }
     };

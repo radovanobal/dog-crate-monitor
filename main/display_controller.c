@@ -7,6 +7,7 @@
 #include "./display_controller.h"
 #include "./display_types.h"
 #include "./screen_types.h"
+#include "generated_icons.h"
 
 typedef struct {
     RenderRegionScene scenes[MAX_RENDER_SCENES];
@@ -46,6 +47,7 @@ static int findCachedSceneIndexByRegionId(DisplayRegionId regionId);
 static int findRenderCountSceneIndexByRegionId(DisplayRegionId regionId);
 static RegionRecoveryPlan determineRegionsForRecovery(const DisplayRenderPlan *displayRenderPlan);
 static DisplayPaintType determinePaintType(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration);
+static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color);
 
 static const char *TAG = "display_controller";
 
@@ -288,7 +290,12 @@ static bool pixelRenderItemEquals(const PixelRenderItem *left, const PixelRender
                    left->data.line.color == right->data.line.color &&
                    left->data.line.thickness == right->data.line.thickness &&
                    left->data.line.style == right->data.line.style;
+        case RENDER_ITEM_TYPE_ICON:
+            return left->data.icon.position.x == right->data.icon.position.x &&
+                   left->data.icon.position.y == right->data.icon.position.y &&
+                   left->data.icon.iconId == right->data.icon.iconId;
     }
+
 
     return false;
 }
@@ -371,10 +378,29 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
                 item->data.line.style
             );
             break;
+        case RENDER_ITEM_TYPE_ICON:
+            paintIconToPixelBuffer(findIconBitmap(item->data.icon.iconId), item->data.icon.position, BLACK);
+            break;
         default:
             ESP_LOGW(TAG, "Unknown render item type: %d", item->type);
     }
 
+}
+
+static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color) {
+    const uint16_t bytesPerRow = icon->bytesPerRow;
+
+    for (uint16_t row = 0; row < icon->height; ++row) {
+        for (uint16_t col = 0; col < icon->width; ++col) {
+            const uint16_t byteIndex = row * bytesPerRow + col / 8;
+            const uint8_t bitMask = (uint8_t)(0x80 >> (col % 8));
+            const bool pixelOn = (icon->bitmap[byteIndex] & bitMask) != 0;
+
+            if (pixelOn) {
+                Paint_SetPixel(position.x + col, position.y + row, color);
+            }
+        }
+    }
 }
 
 static void fullRenderToDisplay(void) {
