@@ -24,6 +24,7 @@ static void initEnvironment(AppState *appState) {
 static void initScreenState(AppState *appState) {
     appState->sharedState.navigationState.activeScreen = SCREEN_ID_HOME;
     appState->sharedState.navigationState.screenGeneration = 1;
+    appState->sharedState.navigationState.lastNonMenuScreen = SCREEN_ID_HOME;
 }
 
 void appStore_updateEnvironmentState(AppState *appState, float temperatureC, float relativeHumidity, int batteryLevel, TimeDate currentTime) {
@@ -33,12 +34,15 @@ void appStore_updateEnvironmentState(AppState *appState, float temperatureC, flo
     appState->sharedState.environmentState.batteryLevel = batteryLevel;
 }
 
-void appStore_updateNavigationState(AppState *appState, ScreenId activeScreen) {
+void appStore_updateNavigationState(AppState *appState, ScreenId activeScreen, bool isMenuNavigation) {
     if (appState->sharedState.navigationState.activeScreen == activeScreen) {
         ESP_LOGW(TAG, "Attempted to update navigation state to the same active screen ID %d. No update performed.", activeScreen);
         return;
     }
 
+    if (!isMenuNavigation) {
+        appState->sharedState.navigationState.lastNonMenuScreen = activeScreen;
+    }
     appState->sharedState.navigationState.activeScreen = activeScreen;
     appState->sharedState.navigationState.screenGeneration++;
 }

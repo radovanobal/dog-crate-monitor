@@ -13,7 +13,7 @@
 static void handleInputEvent(const AppEvent *event, const AppState *state, ScreenActionResult *result);
 static ScreenRegistration createScreenRegistration(ScreenId id, const ScreenInterface *interface);
 static void ensureActiveScreenRegistered(const AppState *state);
-static bool shouldUpdateLastDataScreenId(ScreenPurpose purpose);
+static bool isNonReturnablePurpose(ScreenPurpose purpose);
 
 static const char *TAG = "screen_manager";
 
@@ -48,7 +48,9 @@ DisplayRequest screenManager_buildDisplayRequest(ScreenId screenId, ScreenGenera
 
 ScreenActionResult screenManager_handleEvent(const AppEvent *event, const AppState *appState) {
     if (event->eventType == APP_EVENT_INPUT_RECEIVED) {
-        ScreenActionResult result = {.screenIntent = { .intentType = SCREEN_INTENT_TYPE_NONE }};
+        ScreenActionResult result = {
+            .screenIntent = { .intentType = SCREEN_INTENT_TYPE_NONE }
+        };
         handleInputEvent(event, appState, &result);
         
         if (result.screenIntent.intentType != SCREEN_INTENT_TYPE_NONE) {
@@ -118,12 +120,12 @@ static void ensureActiveScreenRegistered(const AppState *state) {
     registeredScreen.interface->init(state);
     registeredScreen.isInitialized = true;
 
-    if(shouldUpdateLastDataScreenId(registeredScreen.interface->purpose)) {
+    if(isNonReturnablePurpose(registeredScreen.interface->purpose)) {
         lastDataScreenId = activeScreenId;
     }
 }
 
-static bool shouldUpdateLastDataScreenId(ScreenPurpose purpose) {
+static bool isNonReturnablePurpose(ScreenPurpose purpose) {
     for (size_t i = 0; i < ARRAY_SIZE(nonReturnablePurposes); i++) {
         if (nonReturnablePurposes[i] == purpose) {
             return false;
@@ -135,10 +137,17 @@ static bool shouldUpdateLastDataScreenId(ScreenPurpose purpose) {
 
 static void handleInputEvent(const AppEvent *event, const AppState *state, ScreenActionResult *result) {
     if (event->data.inputEventData.buttonType == BUTTON_EVENT_TYPE_BUTTON_SELECT) {
+        const ScreenId currentActiveScreenId = state->sharedState.navigationState.activeScreen == SCREEN_ID_MENU ? lastDataScreenId : SCREEN_ID_MENU;
+        const bool isMenuNavigation = isNonReturnablePurpose(registeredScreen.interface->purpose);
+
         ScreenIntent intent = {
             .intentType = SCREEN_INTENT_TYPE_SCREEN_CHANGE,
-            .data.screenId = state->sharedState.navigationState.activeScreen == SCREEN_ID_MENU ? lastDataScreenId : SCREEN_ID_MENU
+            .data = {
+                .screenId = currentActiveScreenId,
+                .isMenuNavigation = isMenuNavigation
+            }
         };
+
         result->screenIntent = intent;
     }
 

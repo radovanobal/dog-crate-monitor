@@ -3,6 +3,7 @@
 
 #include "./environment_types.h"
 #include "./screen_types.h"
+#include <stdbool.h>
 
 typedef struct {
     TimeDate currentTime;
@@ -34,6 +35,6 @@ void appStore_updateEnvironmentState(
     int batteryLevel, 
     TimeDate currentTime
 );
-void appStore_updateNavigationState(AppState *appState, ScreenId activeScreen);
+void appStore_updateNavigationState(AppState *appState, ScreenId activeScreen, bool isMenuNavigation);
 
 #endif // DOG_CRATE_MONITOR_APP_STORE_H

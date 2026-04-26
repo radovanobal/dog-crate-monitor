@@ -128,7 +128,6 @@ static ScreenActionResult handleEvent(const AppEvent *event, const AppState *sta
     return intent;
 }
 
-
 static void markActiveMenuItem(const AppState *state) {
     for (size_t i = 0; i < menuState.count; i++) {
         if(menuState.items[i].targetScreenId == state->sharedState.navigationState.activeScreen) {

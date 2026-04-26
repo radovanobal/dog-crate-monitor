@@ -15,8 +15,9 @@ typedef enum {
 
 typedef struct {
     ScreenIntentType intentType;
-    union {
+    struct {
         ScreenId screenId; // For SCREEN_INTENT_TYPE_SCREEN_CHANGE
+        bool isMenuNavigation; // For SCREEN_INTENT_TYPE_SCREEN_CHANGE, indicates if the navigation is to/from the menu screen
     } data;
 } ScreenIntent;
 
