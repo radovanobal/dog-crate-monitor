@@ -40,6 +40,13 @@ struct PixelCoordinates2D pixelRegionTopLeft(PixelRegion pixelRegion, struct Pix
     return (struct PixelCoordinates2D){ .x = x, .y = y };
 }
 
+struct PixelCoordinates2D pixelRegionCenterLeft(PixelRegion pixelRegion, struct PixelSize2D pixelItemSize) {
+    const UWORD x = pixelRegion.x;
+    const UWORD y = pixelRegion.y + (pixelRegion.height - pixelItemSize.height) / 2;
+
+    return (struct PixelCoordinates2D){ .x = x, .y = y };
+}
+
 PixelRegion regionToPixelSpace(struct GridRegion gridRegion, ScreenLayout screenLayout) {
     const int pixelX = gridRegion.x * screenLayout.cellWidth;
     const int pixelY = gridRegion.y * screenLayout.cellHeight;
@@ -78,6 +85,9 @@ struct PixelCoordinates2D calculateAlignedTextPosition(
         case REGION_ALIGNMENT_TOP_LEFT:
             textPosition = pixelRegionTopLeft(pixelRegion, textBoxSize);
             break;
+        case REGION_ALIGNMENT_CENTER_LEFT:
+            textPosition = pixelRegionCenterLeft(pixelRegion, textBoxSize);
+            break;    
         default:
             textPosition = pixelRegionCenter(pixelRegion, textBoxSize);
             break;

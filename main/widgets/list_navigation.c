@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "GUI_Paint.h"
 #include "esp_log.h"
 #include "epaper_port.h"
 
@@ -206,6 +207,25 @@ void listNavigation_buildRenderPlan(DisplayRenderPlan *displayRenderPlan) {
             .pixelRegion = navigationRegions[slotIndex].pixelRegion,
             .renderItems = {{0}},
             .count = 0
+        };
+
+        menuItemScene.renderItems[menuItemScene.count++] = (PixelRenderItem){ 
+            .type = RENDER_ITEM_TYPE_LINE,
+            .data = {
+                .line = {
+                    .start = (struct PixelCoordinates2D){
+                        .x = navigationRegions[slotIndex].pixelRegion.x,
+                        .y = navigationRegions[slotIndex].pixelRegion.y + navigationRegions[slotIndex].pixelRegion.height - 1
+                    },
+                    .end = (struct PixelCoordinates2D){
+                        .x = navigationRegions[slotIndex].pixelRegion.x + navigationRegions[slotIndex].pixelRegion.width - 1,
+                        .y = navigationRegions[slotIndex].pixelRegion.y + navigationRegions[slotIndex].pixelRegion.height - 1
+                    },
+                    .color = DISPLAY_COLOR_BLACK, // Black
+                    .thickness = 1,
+                    .style = LINE_STYLE_DOTTED  
+                }
+            }
         };
 
         if (itemIndex >= menuState.itemCount) {
@@ -469,7 +489,7 @@ static void setPixelSpace(void) {
         navigationRegions[slotIndex].gridRegion = (struct GridRegion){ .x = 0, .y = slotIndex, .width = 1, .height = 1 };
         navigationRegions[slotIndex].pixelRegion = (PixelRegion){
             .x = 0,
-            .y = slotIndex * (gridConfig.height / gridConfig.rows) + navigationRegions[DISPLAY_REGION_SLOT_INDICATOR_UP].pixelRegion.height,
+            .y = (slotIndex - 1) * (gridConfig.height / gridConfig.rows) + navigationRegions[DISPLAY_REGION_SLOT_INDICATOR_UP].pixelRegion.height,
             .width = gridConfig.width,
             .height = gridConfig.height / gridConfig.rows
         };
@@ -489,7 +509,7 @@ static struct PixelCoordinates2D setMenuItemPosition(DisplayRegionDescriptor reg
         &region, 
         item.label, 
         item.font, 
-        REGION_ALIGNMENT_TOP_LEFT
+        REGION_ALIGNMENT_CENTER_LEFT
     );
 
     return position;

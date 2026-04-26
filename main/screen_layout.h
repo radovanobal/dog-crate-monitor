@@ -13,6 +13,7 @@ typedef enum {
     REGION_ALIGNMENT_TOP_CENTER = 1,
     REGION_ALIGNMENT_TOP_RIGHT = 2,
     REGION_ALIGNMENT_TOP_LEFT = 3,
+    REGION_ALIGNMENT_CENTER_LEFT = 4,
 } RegionAlignment;
 
 ScreenLayout initRenderGrid(const struct GridConfig gridConfig);
