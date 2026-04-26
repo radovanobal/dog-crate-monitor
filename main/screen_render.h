@@ -11,6 +11,6 @@
 PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font);
 PixelRenderItem createTextUnderlineRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font, DOT_PIXEL thickness);
 PixelRenderItem createLineSeparatorRenderItem(struct PixelCoordinates2D start, struct PixelCoordinates2D end);
-PixelRenderItem createIconBitmapRenderItem(struct PixelCoordinates2D position, IconId iconId, uint16_t color);
+PixelRenderItem createIconBitmapRenderItem(struct PixelCoordinates2D position, IconId iconId, DisplayColor color);
 
 #endif // DOG_CRATE_MONITOR_SCREEN_RENDER_H

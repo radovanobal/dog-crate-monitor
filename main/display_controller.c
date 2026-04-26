@@ -7,6 +7,7 @@
 #include "./display_controller.h"
 #include "./display_types.h"
 #include "./display_pipeline_mono.h"
+#include "./display_pipeline_gray4.h"
 #include "./screen_types.h"
 #include "./generated_icons.h"
 
@@ -108,12 +109,16 @@ static void selectDisplayPipeline(DisplayPipelineType pipelineType) {
         return;
     }
 
+    if (displayPipeline != NULL) {
+        displayPipeline->deinit();
+    }
+
     switch (pipelineType) {
         case DISPLAY_PIPELINE_TYPE_MONO:
             displayPipeline = displayPipelineMono_getPipelineInterface();
             break;
         case DISPLAY_PIPELINE_TYPE_GRAYSCALE:
-            displayPipeline = displayPipelineMono_getPipelineInterface();
+            displayPipeline = displayPipelineGray4_getPipelineInterface();
             // TODO: Implement grayscale pipeline and remove this log
             break;    
         default:
@@ -314,7 +319,7 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
                 pixelRegion->y,
                 pixelRegion->x + pixelRegion->width - 1,
                 pixelRegion->y + pixelRegion->height - 1,
-                WHITE,
+                displayPipeline->getColor(DISPLAY_COLOR_WHITE),
                 DOT_PIXEL_1X1, 
                 DRAW_FILL_FULL
             );
@@ -325,8 +330,8 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
                 item->data.text.position.y,
                 item->data.text.text, 
                 item->data.text.font, 
-                WHITE, 
-                BLACK
+                displayPipeline->getColor(DISPLAY_COLOR_BLACK),
+                displayPipeline->getColor(DISPLAY_COLOR_WHITE)
             );
             break;
         case RENDER_ITEM_TYPE_BITMAP:
@@ -344,7 +349,7 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
                 item->data.rect.position.y,
                 item->data.rect.position.x + item->data.rect.size.width - 1,
                 item->data.rect.position.y + item->data.rect.size.height - 1,
-                item->data.rect.color,
+                displayPipeline->getColor(item->data.rect.color),
                 item->data.rect.thickness,
                 item->data.rect.fillType
             );
@@ -355,18 +360,20 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
                 item->data.line.start.y,
                 item->data.line.end.x,
                 item->data.line.end.y,
-                item->data.line.color, 
+                displayPipeline->getColor(item->data.line.color), 
                 item->data.line.thickness,
                 item->data.line.style
             );
             break;
         case RENDER_ITEM_TYPE_ICON:
-            paintIconToPixelBuffer(findIconBitmap(item->data.icon.iconId), item->data.icon.position, BLACK);
+            paintIconToPixelBuffer(
+                findIconBitmap(
+                    item->data.icon.iconId), item->data.icon.position, displayPipeline->getColor(DISPLAY_COLOR_BLACK)
+                );
             break;
         default:
             ESP_LOGW(TAG, "Unknown render item type: %d", item->type);
     }
-
 }
 
 static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color) {

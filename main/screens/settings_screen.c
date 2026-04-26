@@ -148,7 +148,7 @@ static ScreenRenderResult evaluateDisplay(const AppState *state) {
 
     return (ScreenRenderResult){
         .displayRenderPlan = displayRenderPlan,
-        .pipelineType = DISPLAY_PIPELINE_TYPE_GRAYSCALE
+        .pipelineType = DISPLAY_PIPELINE_TYPE_MONO
     };
 }
 

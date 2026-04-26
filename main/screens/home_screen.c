@@ -289,7 +289,7 @@ static PixelRenderItem createTemperatureIconRenderItem(const AppState *appState)
     iconPosition.x -= 48; // Adjust icon position to be left of the temperature text
     iconPosition.y += 16; // Adjust icon position to be vertically centered with the temperature text
 
-    PixelRenderItem renderItem = createIconBitmapRenderItem(iconPosition, selectTemperatureIcon(nextScreenState.data.temperatureC), BLACK);
+    PixelRenderItem renderItem = createIconBitmapRenderItem(iconPosition, selectTemperatureIcon(nextScreenState.data.temperatureC), DISPLAY_COLOR_BLACK);
 
     return renderItem;
 }
@@ -299,7 +299,7 @@ static PixelRenderItem createHumidityIconRenderItem(const AppState *appState) {
     iconPosition.x -= 18; // Adjust icon position to be left of the humidity text
     iconPosition.y += 4; // Adjust icon position to be vertically centered with the humidity text
 
-    PixelRenderItem renderItem = createIconBitmapRenderItem(iconPosition, ICON_TINT_E80B_24, BLACK);
+    PixelRenderItem renderItem = createIconBitmapRenderItem(iconPosition, ICON_TINT_E80B_24, DISPLAY_COLOR_BLACK);
 
     return renderItem;
 }
@@ -320,7 +320,7 @@ static PixelRenderItem createBatteryIconRenderItem(const AppState *appState) {
     batteryIconPosition.x += 8; // Padding from the left edge of the region
     batteryIconPosition.y += 8; // Padding from the top edge of the region
 
-    PixelRenderItem renderItem = createIconBitmapRenderItem(batteryIconPosition, selectBatteryIcon(nextScreenState.data.batteryLevel), BLACK);
+    PixelRenderItem renderItem = createIconBitmapRenderItem(batteryIconPosition, selectBatteryIcon(nextScreenState.data.batteryLevel), DISPLAY_COLOR_BLACK);
 
     return renderItem;
 }

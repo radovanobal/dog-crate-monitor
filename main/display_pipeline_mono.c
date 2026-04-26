@@ -41,6 +41,7 @@ static int renderRegionPaintCountIncrement(const RenderRegionScene *scene);
 static int findRenderCountSceneIndexByRegionId(DisplayRegionId regionId);
 static RegionRecoveryPlan determineRegionsForRecovery(const DisplayRenderPlan *displayRenderPlan);
 static void recoverRegions(const RegionRecoveryPlan *recoveryPlan);
+static uint16_t getColor(DisplayColor color);
 
 DisplayPipelineInterface* displayPipelineMono_getPipelineInterface() {
     static const DisplayPipelineInterface pipelineInterface = {
@@ -48,6 +49,7 @@ DisplayPipelineInterface* displayPipelineMono_getPipelineInterface() {
         .deinit = deinit,
         .prepareBuffer = prepareBuffer,
         .flushBufferToDisplay = flushBufferToDisplay,
+        .getColor = getColor,
         .pipelineType = DISPLAY_PIPELINE_TYPE_MONO
     };
 
@@ -56,8 +58,6 @@ DisplayPipelineInterface* displayPipelineMono_getPipelineInterface() {
 
 static display_init_error init(void) {
     EPD_Init_Fast();
-    EPD_Clear();   // No initialization needed for the mono pipeline at this time
-
 
     if((ImageMonoBuffer = (UBYTE *)malloc(EPD_SIZE_MONO)) == NULL)
     {
@@ -256,4 +256,20 @@ static int findRenderCountSceneIndexByRegionId(DisplayRegionId regionId) {
     }
 
     return -1;
+}
+
+static uint16_t getColor(DisplayColor color) {
+    switch (color) {
+        case DISPLAY_COLOR_BLACK:
+            return BLACK;
+        case DISPLAY_COLOR_GRAY1:
+            return BLACK;
+        case DISPLAY_COLOR_GRAY2:
+            return WHITE;
+        case DISPLAY_COLOR_WHITE:
+            return WHITE;
+        default:
+            ESP_LOGW(TAG, "Unknown display color: %d. Defaulting to WHITE.", color);
+            return WHITE;
+    }
 }

@@ -74,6 +74,24 @@ typedef enum {
     RENDER_ITEM_TYPE_ICON = 5,
 } RenderItemType;
 
+typedef enum {
+    DISPLAY_SUCCESS = 0,
+    DISPLAY_WARNING = 1,
+    DISPLAY_FAIL = -1
+} display_init_error;
+
+typedef enum {
+    DISPLAY_PIPELINE_TYPE_MONO = 0,
+    DISPLAY_PIPELINE_TYPE_GRAYSCALE = 1
+} DisplayPipelineType;
+
+typedef enum {
+    DISPLAY_COLOR_BLACK = 0,
+    DISPLAY_COLOR_GRAY1 = 1,
+    DISPLAY_COLOR_GRAY2 = 2,
+    DISPLAY_COLOR_WHITE = 3
+} DisplayColor;
+
 typedef struct {
     RenderItemType type;
     union {
@@ -90,19 +108,19 @@ typedef struct {
         struct {
             struct PixelCoordinates2D position;
             IconId iconId;
-            uint16_t color;
+            DisplayColor color;
         } icon;
         struct {
             struct PixelCoordinates2D position;
             struct PixelSize2D size;
-            uint16_t color;
+            DisplayColor color;
             DOT_PIXEL thickness;
             DRAW_FILL fillType;
         } rect;
         struct {
             struct PixelCoordinates2D start;
             struct PixelCoordinates2D end;
-            uint16_t color;
+            DisplayColor color;
             DOT_PIXEL thickness;
             LINE_STYLE style;
         } line;
@@ -121,22 +139,12 @@ typedef struct {
     size_t count;
 } DisplayRenderPlan;
 
-typedef enum {
-    DISPLAY_SUCCESS = 0,
-    DISPLAY_WARNING = 1,
-    DISPLAY_FAIL = -1
-} display_init_error;
-
-typedef enum {
-    DISPLAY_PIPELINE_TYPE_MONO = 0,
-    DISPLAY_PIPELINE_TYPE_GRAYSCALE = 1
-} DisplayPipelineType;
-
 typedef struct {
     display_init_error (*init)(void);
     void (*deinit)(void);
     void (*prepareBuffer)(const DisplayRenderPlan *displayRenderPlan, const DisplayPaintType displayPaintType);
     void (*flushBufferToDisplay)(const DisplayPaintType displayPaintType);
+    uint16_t (*getColor)(DisplayColor color);
     DisplayPipelineType pipelineType;
 } DisplayPipelineInterface;
 

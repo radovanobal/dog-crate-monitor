@@ -33,7 +33,7 @@ PixelRenderItem createTextUnderlineRenderItem(struct PixelCoordinates2D position
                     .x = position.x + font->Width * strlen(text),
                     .y = position.y + font->Height + 2
                 },
-                .color = BLACK, // Black
+                .color = DISPLAY_COLOR_BLACK, // Black
                 .thickness = thickness,
                 .style = LINE_STYLE_SOLID  
             }
@@ -49,7 +49,7 @@ PixelRenderItem createLineSeparatorRenderItem(struct PixelCoordinates2D start, s
             .line = {
                 .start = start,
                 .end = end,
-                .color = GRAY2, // Gray
+                .color = DISPLAY_COLOR_GRAY1, // Gray
                 .thickness = DOT_PIXEL_1X1,
                 .style = LINE_STYLE_SOLID  
             }
@@ -58,7 +58,7 @@ PixelRenderItem createLineSeparatorRenderItem(struct PixelCoordinates2D start, s
     return renderItem;
 }
 
-PixelRenderItem createIconBitmapRenderItem(struct PixelCoordinates2D position, IconId iconId, uint16_t color) {
+PixelRenderItem createIconBitmapRenderItem(struct PixelCoordinates2D position, IconId iconId, DisplayColor color) {
     PixelRenderItem renderItem = (PixelRenderItem) {
         .type = RENDER_ITEM_TYPE_ICON,
         .data = {

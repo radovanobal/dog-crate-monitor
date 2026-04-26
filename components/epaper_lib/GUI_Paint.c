@@ -475,7 +475,7 @@ void Paint_DrawChar(UWORD Xstart, UWORD Ystart, const char Acsii_Char,
     const unsigned char *ptr = font_buffer;
     for (Page = 0; Page < Font->Height; Page++) {
         for (Column = 0; Column < Font->Width; Column++) {
-            if (*ptr & (0x80 >> (Column % 8))) {
+            if ((*ptr & (0x80 >> (Column % 8))) == 0) {
                 Paint_SetPixel(Xstart + Column, Ystart + Page, Color_Foreground);
             } else {
                 Paint_SetPixel(Xstart + Column, Ystart + Page, Color_Background);
@@ -607,7 +607,7 @@ void Paint_DrawString_CN(UWORD Xstart, UWORD Ystart, const char * pString, cFONT
         int row, col;
         for (row = 0; row < char_height; row++) {
             for (col = 0; col < char_width; col++) {
-                if (*ptr & (0x80 >> (col % 8))) {
+                if ((*ptr & (0x80 >> (col % 8))) == 0) {
                     Paint_SetPixel(x + col, y + row, Color_Foreground);
                 } else {
                     Paint_SetPixel(x + col, y + row, Color_Background);
