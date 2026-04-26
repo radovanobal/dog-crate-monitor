@@ -1,4 +1,3 @@
-#include "GUI_Paint.h"
 #include "esp_log.h"
 #include "epaper_port.h"
 
@@ -13,6 +12,7 @@
 #include "screen_types.h"
 #include "../screens/home_screen.h"
 #include "../generated_icons.h"
+#include <sys/stat.h>
 
 typedef struct {
     struct {
@@ -37,12 +37,14 @@ static const DisplayRegionId DISPLAY_REGION_CLOCK = 0;
 static const DisplayRegionId DISPLAY_REGION_TEMPERATURE = 1;
 static const DisplayRegionId DISPLAY_REGION_HUMIDITY = 2;
 static const DisplayRegionId DISPLAY_REGION_ALERT = 3;
+static const DisplayRegionId DISPLAY_REGION_BATTERY = 4;
 
 enum {
     HOME_REGION_SLOT_CLOCK = 0,
     HOME_REGION_SLOT_TEMPERATURE = 1,
     HOME_REGION_SLOT_HUMIDITY = 2,
     HOME_REGION_SLOT_ALERT = 3,
+    HOME_REGION_SLOT_BATTERY = 4
 };
 
 // Define the grid dimensions
@@ -57,14 +59,16 @@ static DisplayRegionDescriptor displayRegions[] = {
     [HOME_REGION_SLOT_CLOCK] = {  .id = DISPLAY_REGION_CLOCK },
     [HOME_REGION_SLOT_TEMPERATURE] = { .id = DISPLAY_REGION_TEMPERATURE },
     [HOME_REGION_SLOT_HUMIDITY] = { .id = DISPLAY_REGION_HUMIDITY },
-    [HOME_REGION_SLOT_ALERT] = { .id = DISPLAY_REGION_ALERT }
+    [HOME_REGION_SLOT_ALERT] = { .id = DISPLAY_REGION_ALERT },
+    [HOME_REGION_SLOT_BATTERY] = { .id = DISPLAY_REGION_BATTERY }
 };
 
 static DirtyRegionEntry dirtyDisplayRegions[] = {
     [HOME_REGION_SLOT_CLOCK] = { .regionId = DISPLAY_REGION_CLOCK, .isDirty = false },
     [HOME_REGION_SLOT_TEMPERATURE] = { .regionId = DISPLAY_REGION_TEMPERATURE, .isDirty = false },
     [HOME_REGION_SLOT_HUMIDITY] = { .regionId = DISPLAY_REGION_HUMIDITY, .isDirty = false },
-    [HOME_REGION_SLOT_ALERT] = { .regionId = DISPLAY_REGION_ALERT, .isDirty = false }
+    [HOME_REGION_SLOT_ALERT] = { .regionId = DISPLAY_REGION_ALERT, .isDirty = false },
+    [HOME_REGION_SLOT_BATTERY] = { .regionId = DISPLAY_REGION_BATTERY, .isDirty = false }
 };
 
 // Log tag
@@ -187,7 +191,7 @@ static void determineDirtyRegions(void) {
     }
 
     if(homeScreenState.data.batteryLevel != nextScreenState.data.batteryLevel) {
-        dirtyDisplayRegions[HOME_REGION_SLOT_CLOCK].isDirty = strcmp(nextScreenState.derived.batteryLevelText, homeScreenState.derived.batteryLevelText) != 0;
+        dirtyDisplayRegions[HOME_REGION_SLOT_BATTERY].isDirty = strcmp(nextScreenState.derived.batteryLevelText, homeScreenState.derived.batteryLevelText) != 0;
     }
 }
 
@@ -201,14 +205,25 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             .regionId = DISPLAY_REGION_CLOCK,
             .pixelRegion = displayRegions[HOME_REGION_SLOT_CLOCK].pixelRegion,
             .renderItems = {
-                [0] = createClockRenderItem(appState),
-                [1] = createBatteryLevelRenderItem(appState),
-                [2] = createBatteryIconRenderItem(appState)
+                [0] = createClockRenderItem(appState)
             },
-            .count = 3
+            .count = 1
         };
 
         displayRenderPlan.regions[sceneItemIndex++] = clockScene;
+    }
+
+    if (dirtyDisplayRegions[HOME_REGION_SLOT_BATTERY].isDirty) {
+        RenderRegionScene batteryScene = {
+            .regionId = DISPLAY_REGION_BATTERY,
+            .pixelRegion = displayRegions[HOME_REGION_SLOT_BATTERY].pixelRegion,
+            .renderItems = {
+                [0] = createBatteryLevelRenderItem(appState),
+                [1] = createBatteryIconRenderItem(appState)
+            },
+            .count = 2
+        };
+        displayRenderPlan.regions[sceneItemIndex++] = batteryScene;
     }
 
     if(dirtyDisplayRegions[HOME_REGION_SLOT_TEMPERATURE].isDirty) {
@@ -267,7 +282,7 @@ static PixelRenderItem createClockRenderItem(const AppState *appState) {
 static PixelRenderItem createBatteryLevelRenderItem(const AppState *appState) {        
     ESP_LOGI(TAG, "Battery level changed from '%s' to '%s'", homeScreenState.derived.batteryLevelText, nextScreenState.derived.batteryLevelText);
 
-    struct PixelCoordinates2D batteryLevelTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.batteryLevelText, &Font12, REGION_ALIGNMENT_TOP_LEFT);
+    struct PixelCoordinates2D batteryLevelTextPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_BATTERY], nextScreenState.derived.batteryLevelText, &Font12, REGION_ALIGNMENT_TOP_LEFT);
     batteryLevelTextPosition.x += 48; // Adjust text position to be right of the battery icon
     batteryLevelTextPosition.y += 8; // Padding from the top edge of the region
     PixelRenderItem renderItem = createTextRenderItem(batteryLevelTextPosition, nextScreenState.derived.batteryLevelText, &Font12);
@@ -316,7 +331,7 @@ static PixelRenderItem createHumidityRenderItem(const AppState *appState) {
 static PixelRenderItem createBatteryIconRenderItem(const AppState *appState) {
     ESP_LOGI(TAG, "Battery icon changed from '%s' to '%s'", homeScreenState.derived.batteryLevelText, nextScreenState.derived.batteryLevelText);
 
-    struct PixelCoordinates2D batteryIconPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_CLOCK], nextScreenState.derived.batteryLevelText, &Font12, REGION_ALIGNMENT_TOP_LEFT);
+    struct PixelCoordinates2D batteryIconPosition = calculateAlignedTextPosition(&displayRegions[HOME_REGION_SLOT_BATTERY], nextScreenState.derived.batteryLevelText, &Font12, REGION_ALIGNMENT_TOP_LEFT);
     batteryIconPosition.x += 8; // Padding from the left edge of the region
     batteryIconPosition.y += 8; // Padding from the top edge of the region
 
@@ -365,10 +380,11 @@ static IconId selectBatteryIcon(int batteryLevel) {
 
 static void initRenderRegions(void)
 {
-    displayRegions[HOME_REGION_SLOT_CLOCK].gridRegion = (struct GridRegion){ .x = 0, .y = 0, .width = 5, .height = 1 };
+    displayRegions[HOME_REGION_SLOT_CLOCK].gridRegion = (struct GridRegion){ .x = 2, .y = 0, .width = 3, .height = 1 };
     displayRegions[HOME_REGION_SLOT_TEMPERATURE].gridRegion = (struct GridRegion){ .x = 1, .y = 1, .width = 3, .height = 2 };
     displayRegions[HOME_REGION_SLOT_HUMIDITY].gridRegion = (struct GridRegion){ .x = 1, .y = 3, .width = 3, .height = 1 };
     displayRegions[HOME_REGION_SLOT_ALERT].gridRegion = (struct GridRegion){.x = 1, .y = 1, .width = 1, .height = 2};
+    displayRegions[HOME_REGION_SLOT_BATTERY].gridRegion = (struct GridRegion){.x = 0, .y = 0, .width = 2, .height = 1 };
 
     const int regionCount = ARRAY_SIZE(displayRegions);
     calculateDisplayRegionsPixelSpace(displayRegions, regionCount, screenLayout);
