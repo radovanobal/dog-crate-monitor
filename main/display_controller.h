@@ -6,6 +6,6 @@
 
 display_init_error displayController_init(void);
 void displayController_deinit(void);
-void displayController_requestRender(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration);
+void displayController_requestRender(const DisplayRequest *displayRequest);
 
 #endif // DOG_CRATE_MONITOR_DISPLAY_CONTROLLER_H

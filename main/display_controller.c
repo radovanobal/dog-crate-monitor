@@ -6,8 +6,9 @@
 
 #include "./display_controller.h"
 #include "./display_types.h"
+#include "./display_pipeline_mono.h"
 #include "./screen_types.h"
-#include "generated_icons.h"
+#include "./generated_icons.h"
 
 typedef struct {
     RenderRegionScene scenes[MAX_RENDER_SCENES];
@@ -32,81 +33,97 @@ typedef struct {
 static void initEpaperDisplay(void);
 static void clearCachedScenePlan(void);
 static void fullRenderToDisplay();
+static void selectDisplayPipeline(DisplayPipelineType pipelineType);
 static void partialRenderToDisplay(const DisplayRenderPlan *displayRenderPlan);
 static void paintRenderPlan();
 static void paintScene(const RenderRegionScene *scene);
 static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixelRegion);
 static void updateRenderPlanCache(const DisplayRenderPlan *newPlan);
-static void recoverRegions(const RegionRecoveryPlan *recoveryPlan);
 static bool didScreenGenerationChanged(ScreenGeneration current, ScreenGeneration last);
 static bool doesScenePlanMatchCache(const DisplayRenderPlan *incomingPlan);
 static bool doesRenderRegionSceneEquals(const RenderRegionScene *left, const RenderRegionScene *right);
 static bool pixelRenderItemEquals(const PixelRenderItem *item1, const PixelRenderItem *item2);
 static bool pixelRegionEquals(const PixelRegion *left, const PixelRegion *right);
 static int findCachedSceneIndexByRegionId(DisplayRegionId regionId);
-static int findRenderCountSceneIndexByRegionId(DisplayRegionId regionId);
-static RegionRecoveryPlan determineRegionsForRecovery(const DisplayRenderPlan *displayRenderPlan);
 static DisplayPaintType determinePaintType(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration);
 static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color);
 
 static const char *TAG = "display_controller";
 
 static RenderSceneCache cacheRenderPlan = {0};
-static RegionRefreshStateCache regionRefreshStateCache = {0};
-static uint8_t *ImageMonoBuffer;
-static const int maxPartialRenderCount = 50;
 static ScreenGeneration lastRenderedScreenGeneration = 0;
+static DisplayPipelineInterface *displayPipeline = NULL;
 
 display_init_error displayController_init(void) {
     initEpaperDisplay();
-
-    if((ImageMonoBuffer = (UBYTE *)malloc(EPD_SIZE_MONO)) == NULL)
-    {
-        ESP_LOGE(TAG,"Failed to apply for black memory...");
-        return DISPLAY_FAIL;
-    }
-
     return DISPLAY_SUCCESS;
 }
 
 void displayController_deinit(void) {
-    if (ImageMonoBuffer != NULL) {
-        free(ImageMonoBuffer);
-        ImageMonoBuffer = NULL;
+    if (displayPipeline != NULL) {
+        displayPipeline->deinit();
+        displayPipeline = NULL;
     }
 }
 
-void displayController_requestRender(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration) {
-    if(didScreenGenerationChanged(screenGeneration, lastRenderedScreenGeneration)) {
+void displayController_requestRender(const DisplayRequest *displayRequest) {
+    selectDisplayPipeline(displayRequest->pipelineType);
+
+    if(didScreenGenerationChanged(displayRequest->screenGeneration, lastRenderedScreenGeneration)) {
         clearCachedScenePlan();
     }
 
-    DisplayPaintType paintType = determinePaintType(displayRenderPlan, screenGeneration);
+    DisplayPaintType paintType = determinePaintType(&displayRequest->displayRenderPlan, displayRequest->screenGeneration);
     
-    updateRenderPlanCache(displayRenderPlan);
+    updateRenderPlanCache(&displayRequest->displayRenderPlan);
 
     switch (paintType) {
         case DISPLAY_PAINT_TYPE_FULL:
+            displayPipeline->prepareBuffer(&displayRequest->displayRenderPlan, DISPLAY_PAINT_TYPE_FULL);
             fullRenderToDisplay();
+            displayPipeline->flushBufferToDisplay(DISPLAY_PAINT_TYPE_FULL);
             break;
         case DISPLAY_PAINT_TYPE_PARTIAL:
-            partialRenderToDisplay(displayRenderPlan);
+            displayPipeline->prepareBuffer(&displayRequest->displayRenderPlan, DISPLAY_PAINT_TYPE_PARTIAL);
+            partialRenderToDisplay(&displayRequest->displayRenderPlan);
+            displayPipeline->flushBufferToDisplay(DISPLAY_PAINT_TYPE_PARTIAL);
             break;
         case DISPLAY_PAINT_TYPE_NONE:
-            ESP_LOGI(TAG, "No paint required for screen generation %u", (unsigned)screenGeneration);
+            ESP_LOGI(TAG, "No paint required for screen generation %u", (unsigned)displayRequest->screenGeneration);
             break;    
         default:
             ESP_LOGW(TAG, "Unknown paint type: %d", paintType);
     }
 
-    lastRenderedScreenGeneration = screenGeneration;
+    lastRenderedScreenGeneration = displayRequest->screenGeneration;
 }
 
 static void initEpaperDisplay(void) {
     ESP_LOGI(TAG,"1.e-Paper Init and Clear...");
     epaper_port_init();
-    EPD_Init();
-    EPD_Clear();
+}
+
+static void selectDisplayPipeline(DisplayPipelineType pipelineType) {
+    if (displayPipeline != NULL && displayPipeline->pipelineType == pipelineType) {
+        return;
+    }
+
+    switch (pipelineType) {
+        case DISPLAY_PIPELINE_TYPE_MONO:
+            displayPipeline = displayPipelineMono_getPipelineInterface();
+            break;
+        case DISPLAY_PIPELINE_TYPE_GRAYSCALE:
+            displayPipeline = displayPipelineMono_getPipelineInterface();
+            // TODO: Implement grayscale pipeline and remove this log
+            break;    
+        default:
+            ESP_LOGW(TAG, "Unknown display pipeline type: %d. Defaulting to mono pipeline.", pipelineType);
+            displayPipeline = displayPipelineMono_getPipelineInterface();
+    }
+
+    if (displayPipeline->init() != DISPLAY_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to initialize display pipeline");
+    }
 }
 
 static void updateRenderPlanCache(const DisplayRenderPlan *newPlan) {
@@ -176,32 +193,6 @@ static bool doesScenePlanMatchCache(const DisplayRenderPlan *incomingPlan) {
     return true;
 }
 
-static int renderRegionPaintCountIncrement(const RenderRegionScene *scene) {
-    const int regionStateIndex = findRenderCountSceneIndexByRegionId(scene->regionId);
-
-    if (regionStateIndex >= 0) {
-        regionRefreshStateCache.states[regionStateIndex].regionPaintCount++;
-        return regionStateIndex;
-    }
-
-    if (regionRefreshStateCache.count >= MAX_RENDER_SCENES) {
-        ESP_LOGW(
-            TAG,
-            "Region refresh state cache is full (%u). Skipping paint count tracking for region %u.",
-            (unsigned)MAX_RENDER_SCENES,
-            (unsigned)scene->regionId
-        );
-        return -1;
-    }
-
-    regionRefreshStateCache.states[regionRefreshStateCache.count++] = (RegionRefreshState){ 
-        .regionId = scene->regionId, 
-        .regionPaintCount = 1 
-    };
-
-    return regionRefreshStateCache.count - 1;
-}
-
 static bool doesRenderRegionSceneEquals(const RenderRegionScene *left, const RenderRegionScene *right) {
     if (left->regionId != right->regionId) {
         return false;
@@ -234,15 +225,6 @@ static int findCachedSceneIndexByRegionId(DisplayRegionId regionId) {
     return -1;
 }
 
-static int findRenderCountSceneIndexByRegionId(DisplayRegionId regionId) {
-    for (size_t i = 0; i < regionRefreshStateCache.count; i++) {
-        if (regionRefreshStateCache.states[i].regionId == regionId) {
-            return i;
-        }
-    }
-
-    return -1;
-}
 
 static bool pixelRegionEquals(const PixelRegion *left, const PixelRegion *right) {
     return left->x == right->x &&
@@ -404,14 +386,7 @@ static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoo
 }
 
 static void fullRenderToDisplay(void) {
-    Paint_NewImage(ImageMonoBuffer, EPD_WIDTH, EPD_HEIGHT, ROTATE_0, WHITE);
-    Paint_SelectImage(ImageMonoBuffer);
-    Paint_Clear(WHITE);
-
     paintRenderPlan();
-
-    EPD_Display_Base(ImageMonoBuffer);
-    regionRefreshStateCache = (RegionRefreshStateCache){0};
 }
 
 static void partialRenderToDisplay(const DisplayRenderPlan *displayRenderPlan) {
@@ -420,123 +395,10 @@ static void partialRenderToDisplay(const DisplayRenderPlan *displayRenderPlan) {
         return;
     }
 
-    RegionRecoveryPlan recoveryPlan = determineRegionsForRecovery(displayRenderPlan);
-    if (recoveryPlan.count > 0) {
-        ESP_LOGI(TAG, "Recovering %u regions before partial render", (unsigned)recoveryPlan.count);
-        recoverRegions(&recoveryPlan);
-    }
-
-    Paint_NewImage(ImageMonoBuffer, EPD_WIDTH, EPD_HEIGHT, ROTATE_0, WHITE);
-    Paint_SelectImage(ImageMonoBuffer);
-
     for (size_t i = 0; i < displayRenderPlan->count; i++) {
         const RenderRegionScene *scene = &displayRenderPlan->regions[i];
 
         clearSceneRegion(&scene->pixelRegion);
         paintScene(scene);
     }
-
-    /*
-    When the driver supports partial update, use the code below to update the corresponding region of the screen.
-    For now we have to target the full screen for partial updates, as the driver doesn't support region updates 
-    and we need to sync the full buffer with the region image before updating the screen.
-
-    EPD_Display_Partial(
-        ImagePartialMono,
-        pixelRegion.x,
-        gridConfig.height - (pixelRegion.y + pixelRegion.height),
-        pixelRegion.x + pixelRegion.width,
-        gridConfig.height - pixelRegion.y
-    );    
-
-    */
-    
-    EPD_Display_Partial(
-        ImageMonoBuffer,
-        0,
-        0,
-        EPD_WIDTH,
-        EPD_HEIGHT
-    );
-}
-
-static RegionRecoveryPlan determineRegionsForRecovery(const DisplayRenderPlan *displayRenderPlan) {
-    RegionRecoveryPlan recoveryPlan = {0};
-    
-    for (size_t i = 0; i < displayRenderPlan->count; i++) {
-        const RenderRegionScene *scene = &displayRenderPlan->regions[i];
-        const int regionStateIndex =renderRegionPaintCountIncrement(scene);
-
-        if (recoveryPlan.count >= MAX_RENDER_SCENES) {
-            ESP_LOGW(TAG,
-                "Recovery plan full (%u). Breaking recovery plan generation.",
-                (unsigned)MAX_RENDER_SCENES
-            );
-
-            break;
-        }
-
-        if (regionStateIndex >= 0 && regionRefreshStateCache.states[regionStateIndex].regionPaintCount >= maxPartialRenderCount) {
-            ESP_LOGI(TAG, "Region ID %d has been painted %u times. Marking for full refresh.",
-                regionRefreshStateCache.states[regionStateIndex].regionId,
-                (unsigned)regionRefreshStateCache.states[regionStateIndex].regionPaintCount
-            );
-
-            recoveryPlan.scenes[recoveryPlan.count++] = scene;
-            regionRefreshStateCache.states[regionStateIndex].regionPaintCount = 0;
-        }
-    }
-
-    return recoveryPlan;
-}
-
-static void recoverRegions(const RegionRecoveryPlan *recoveryPlan) {
-    Paint_NewImage(ImageMonoBuffer, EPD_WIDTH, EPD_HEIGHT, ROTATE_0, WHITE);
-    Paint_SelectImage(ImageMonoBuffer);
-
-    for (size_t i = 0; i < recoveryPlan->count; i++) {
-        const RenderRegionScene *scene = recoveryPlan->scenes[i];
-        const PixelRegion *pixelRegion = &scene->pixelRegion;
-
-        Paint_DrawRectangle(
-            pixelRegion->x,
-            pixelRegion->y,
-            pixelRegion->x + pixelRegion->width - 1,
-            pixelRegion->y + pixelRegion->height - 1,
-            WHITE,
-            DOT_PIXEL_1X1, 
-            DRAW_FILL_FULL
-        );
-    }
-
-    EPD_Display_Partial(
-        ImageMonoBuffer,
-        0,
-        0,
-        EPD_WIDTH,
-        EPD_HEIGHT
-    );
-
-    for (size_t i = 0; i < recoveryPlan->count; i++) {
-        const RenderRegionScene *scene = recoveryPlan->scenes[i];
-        const PixelRegion *pixelRegion = &scene->pixelRegion;
-
-        Paint_DrawRectangle(
-            pixelRegion->x,
-            pixelRegion->y,
-            pixelRegion->x + pixelRegion->width - 1,
-            pixelRegion->y + pixelRegion->height - 1,
-            BLACK,
-            DOT_PIXEL_1X1, 
-            DRAW_FILL_FULL
-        );
-    }
-
-    EPD_Display_Partial(
-        ImageMonoBuffer,
-        0,
-        0,
-        EPD_WIDTH,
-        EPD_HEIGHT
-    );
 }

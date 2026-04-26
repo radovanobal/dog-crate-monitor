@@ -132,6 +132,7 @@ static ScreenRenderResult evaluateDisplay(const AppState *appState) {
     DisplayRenderPlan displayRenderPlan = buildDisplayRenderPlan(appState);
 
     result.displayRenderPlan = displayRenderPlan;
+    result.pipelineType = DISPLAY_PIPELINE_TYPE_MONO;
 
     homeScreenState = nextScreenState;
     return result;

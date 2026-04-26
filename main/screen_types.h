@@ -25,6 +25,7 @@ typedef struct {
     ScreenId screenId;
     ScreenGeneration screenGeneration;
     DisplayRenderPlan displayRenderPlan;
+    DisplayPipelineType pipelineType;
 } DisplayRequest;
 
 typedef struct {
@@ -34,6 +35,7 @@ typedef struct {
 
 typedef struct {
     DisplayRenderPlan displayRenderPlan;
+    DisplayPipelineType pipelineType;
 } ScreenRenderResult;
 
 typedef struct {

@@ -30,7 +30,7 @@ void screenManager_render(DisplayRequest *displayRequest) {
         return;
     }
 
-    displayController_requestRender(&displayRequest->displayRenderPlan, displayRequest->screenGeneration);
+    displayController_requestRender(displayRequest);
 }
 
 DisplayRequest screenManager_buildDisplayRequest(ScreenId screenId, ScreenGeneration screenGeneration, const ScreenRenderResult *renderResult) {    
@@ -38,6 +38,7 @@ DisplayRequest screenManager_buildDisplayRequest(ScreenId screenId, ScreenGenera
         .screenId = screenId,
         .screenGeneration = screenGeneration,
         .displayRenderPlan = renderResult->displayRenderPlan,
+        .pipelineType = renderResult->pipelineType
     };
 
     lastScreenGeneration = screenGeneration;

@@ -127,4 +127,17 @@ typedef enum {
     DISPLAY_FAIL = -1
 } display_init_error;
 
+typedef enum {
+    DISPLAY_PIPELINE_TYPE_MONO = 0,
+    DISPLAY_PIPELINE_TYPE_GRAYSCALE = 1
+} DisplayPipelineType;
+
+typedef struct {
+    display_init_error (*init)(void);
+    void (*deinit)(void);
+    void (*prepareBuffer)(const DisplayRenderPlan *displayRenderPlan, const DisplayPaintType displayPaintType);
+    void (*flushBufferToDisplay)(const DisplayPaintType displayPaintType);
+    DisplayPipelineType pipelineType;
+} DisplayPipelineInterface;
+
 #endif // DOG_CRATE_MONITOR_DISPLAY_TYPES_H
