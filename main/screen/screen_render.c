@@ -50,9 +50,25 @@ PixelRenderItem createLineSeparatorRenderItem(struct PixelCoordinates2D start, s
             .line = {
                 .start = start,
                 .end = end,
-                .color = DISPLAY_COLOR_GRAY1, // Gray
+                .color = DISPLAY_COLOR_GRAY1, // Dark Gray
                 .thickness = DOT_PIXEL_1X1,
                 .style = LINE_STYLE_SOLID  
+            }
+        }
+    };
+    return renderItem;
+}
+
+PixelRenderItem createBoxItem(struct PixelCoordinates2D position, struct PixelSize2D size, DOT_PIXEL thickness, DRAW_FILL fillType) {
+    PixelRenderItem renderItem = (PixelRenderItem) {
+        .type = RENDER_ITEM_TYPE_RECT,
+        .data = {
+            .rect = {
+                .position = position,
+                .size = size,
+                .color = DISPLAY_COLOR_GRAY1, // Dark Gray
+                .thickness = thickness,
+                .fillType = fillType
             }
         }
     };

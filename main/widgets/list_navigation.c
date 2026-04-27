@@ -492,6 +492,7 @@ static void setPixelSpace(void) {
             .x = 0,
             .y = (slotIndex - 1) * (gridConfig.height / gridConfig.rows) + navigationRegions[DISPLAY_REGION_SLOT_INDICATOR_UP].pixelRegion.height,
             .width = gridConfig.width,
+            
             .height = gridConfig.height / gridConfig.rows
         };
     }
