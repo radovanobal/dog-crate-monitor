@@ -43,7 +43,7 @@ static size_t activeKeyIndex = 0;
 static size_t cursorPosition = 0;
 static size_t textLength = 0;
 
-static InputKeyboardKey keyLookupRegistry[MAX_TEXT_LENGTH] = {0};
+static InputKeyboardKey keyLookupRegistry[MAX_GRID_CELLS] = {0};
 
 static const struct GridConfig gridConfig = {
     .width = EPD_WIDTH,
@@ -74,6 +74,9 @@ void inputKeyboard_init(char* storedText) {
 
     strncpy(currentText, storedText, MAX_TEXT_LENGTH - 1);
     currentText[MAX_TEXT_LENGTH - 1] = '\0';
+
+    textLength = strlen(currentText);
+    cursorPosition = textLength; // Start with cursor at the end of the text
 
     setPixelSpace();
     rebuildKeyboardLookupRegistry();
@@ -115,6 +118,9 @@ void inputKeyboard_setText(const char* newText) {
 
     strncpy(currentText, newText, MAX_TEXT_LENGTH - 1);
     currentText[MAX_TEXT_LENGTH - 1] = '\0';
+
+    textLength = strlen(currentText);
+    cursorPosition = textLength; // Start with cursor at the end of the text
 }
 
 char* inputKeyboard_getText() {
@@ -122,6 +128,8 @@ char* inputKeyboard_getText() {
 }
 
 static void rebuildKeyboardLookupRegistry() {
+    memset(keyLookupRegistry, 0, sizeof(keyLookupRegistry));
+
     KeyboardCharacterMap characterMap = getKeyboardCharacterMap(currentKeyboardLayout);
     KeyboardActionKeysMap actionKeysMap = getKeyboardActionKeysMap(currentKeyboardLayout);
 
@@ -268,7 +276,7 @@ static void buildKeyboardScene(DisplayRenderPlan *displayRenderPlan) {
     };
 
     PixelRenderItem keyboardBackground = createBoxItem(
-        (struct PixelCoordinates2D){ .x = 0, .y = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.y },
+        (struct PixelCoordinates2D){ .x = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.x, .y = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.y },
         (struct PixelSize2D){ .width = gridConfig.width, .height = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.height },
         DOT_PIXEL_1X1,
         DRAW_FILL_EMPTY
@@ -287,8 +295,8 @@ static PixelRenderItem createKeyboardButtonsRenderItem() {
         .type = RENDER_ITEM_TYPE_GRID,
         .data = {
             .grid = {
-                .position = (struct PixelCoordinates2D){ .x = 0, .y = 0 },
-                .size = (struct PixelSize2D){ .width = 0, .height = 0 },
+                .position = (struct PixelCoordinates2D){ .x = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.x, .y = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.y },
+                .size = (struct PixelSize2D){ .width = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.width, .height = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.height },
                 .colorAccent = DISPLAY_COLOR_BLACK,
                 .colorDefault = DISPLAY_COLOR_WHITE,
                 .rows = 5,
@@ -297,6 +305,10 @@ static PixelRenderItem createKeyboardButtonsRenderItem() {
             }
         }
     };
+
+    if (ARRAY_SIZE(keyLookupRegistry) > ARRAY_SIZE(renderItem.data.grid.cells)) {
+        ESP_LOGW("InputKeyboard", "Key lookup registry size exceeds grid cell capacity. Some keys will not be rendered.");
+    }
 
     for (size_t i = 0; i < ARRAY_SIZE(keyLookupRegistry); i++) {
         if (keyLookupRegistry[i].type == INPUT_KEY_TYPE_CHARACTER) {
