@@ -1,6 +1,10 @@
+#include <stddef.h>
+
+#include "esp_log.h"
+
 #include "keyboard_char_map.h"
 #include "./utils/macros.h"
-#include <stddef.h>
+
 
 static const char numbers[] = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
@@ -21,9 +25,28 @@ static const char specialChars[] = {
     '`', '{', '|', '}', '~'
 };
 
-static const KeyboardActionKey actionKeys[] = {
+static const KeyboardActionKey alphaActionKeys[] = {
     KEYBOARD_SPECIAL_KEY_SPACE,
     KEYBOARD_SPECIAL_KEY_SHIFT,
+    KEYBOARD_SPECIAL_KEY_MODE,
+    KEYBOARD_SPECIAL_KEY_BACKSPACE,
+    KEYBOARD_SPECIAL_KEY_ENTER,
+    KEYBOARD_SPECIAL_KEY_CLEAR,
+    KEYBOARD_SPECIAL_KEY_CURSOR_LEFT,
+    KEYBOARD_SPECIAL_KEY_CURSOR_RIGHT,
+};
+
+static const KeyboardActionKey numericActionKeys[] = {
+    KEYBOARD_SPECIAL_KEY_SPACE,
+    KEYBOARD_SPECIAL_KEY_MODE,
+    KEYBOARD_SPECIAL_KEY_BACKSPACE,
+    KEYBOARD_SPECIAL_KEY_ENTER,
+    KEYBOARD_SPECIAL_KEY_CLEAR,
+    KEYBOARD_SPECIAL_KEY_CURSOR_LEFT,
+    KEYBOARD_SPECIAL_KEY_CURSOR_RIGHT,
+};
+
+static const KeyboardActionKey specialActionKeys[] = {
     KEYBOARD_SPECIAL_KEY_MODE,
     KEYBOARD_SPECIAL_KEY_BACKSPACE,
     KEYBOARD_SPECIAL_KEY_ENTER,
@@ -57,10 +80,25 @@ KeyboardCharacterMap getKeyboardCharacterMap(KeyboardLayoutId layoutId) {
 
 // TODO: layout ID may need to filter some action keys in the future if certain keys are not relevant for specific layouts; if not remove it
 KeyboardActionKeysMap getKeyboardActionKeysMap(KeyboardLayoutId layoutId) { 
-    KeyboardActionKeysMap map = {
-        .actionKeys = actionKeys,
-        .count = ARRAY_SIZE(actionKeys)
-    };
+    KeyboardActionKeysMap map = {0};
+
+    switch (layoutId) {
+        case KEYBOARD_LAYOUT_ALPHA:
+            map.actionKeys = alphaActionKeys;
+            map.count = ARRAY_SIZE(alphaActionKeys);
+            break;
+        case KEYBOARD_LAYOUT_NUMERIC:
+            map.actionKeys = numericActionKeys;
+            map.count = ARRAY_SIZE(numericActionKeys);
+            break;
+        case KEYBOARD_LAYOUT_SPECIAL:
+            map.actionKeys = specialActionKeys;
+            map.count = ARRAY_SIZE(specialActionKeys);
+            break;
+        default:
+            ESP_LOGW("KeyboardCharMap", "Unknown keyboard layout ID: %d. Returning empty action keys map.", layoutId);
+            break;
+    }
 
     return map;
 }
@@ -91,6 +129,7 @@ const char *getKeyboardActionKeyDisplayText(KeyboardActionKey actionKey) {
         case KEYBOARD_SPECIAL_KEY_CLEAR:
             return "Clear";
         default:
+            ESP_LOGW("KeyboardCharMap", "Unknown action key: %d. Returning empty display text.", actionKey);
             return "";
     }
 }

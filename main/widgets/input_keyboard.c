@@ -12,10 +12,9 @@
 #include "app_event.h"
 #include "utils/macros.h"
 
-#define MAX_TEXT_LENGTH 65
 
 typedef enum {
-    INPUT_KEY_TYPE_CHARACTER,
+    INPUT_KEY_TYPE_CHARACTER = 0,
     INPUT_KEY_TYPE_ACTION
 } InputKeyType;
 
@@ -26,8 +25,6 @@ typedef struct {
         KeyboardActionKey actionKey;
     };
 } InputKeyboardKey;
-
-static char currentText[MAX_TEXT_LENGTH] = {0};
 
 static void buildInputScene(DisplayRenderPlan *displayRenderPlan);
 static void buildKeyboardScene(DisplayRenderPlan *displayRenderPlan);
@@ -42,6 +39,14 @@ static KeyboardLayoutId currentKeyboardLayout = KEYBOARD_LAYOUT_ALPHA;
 static size_t activeKeyIndex = 0;
 static size_t cursorPosition = 0;
 static size_t textLength = 0;
+
+static char currentText[MAX_TEXT_INPUT_LENGTH] = {0};
+
+static KeyboardLayoutId layoutModeOrder[] = {
+    KEYBOARD_LAYOUT_ALPHA,
+    KEYBOARD_LAYOUT_NUMERIC,
+    KEYBOARD_LAYOUT_SPECIAL
+};
 
 static InputKeyboardKey keyLookupRegistry[MAX_GRID_CELLS] = {0};
 
@@ -72,8 +77,8 @@ void inputKeyboard_init(char* storedText) {
         return;
     }
 
-    strncpy(currentText, storedText, MAX_TEXT_LENGTH - 1);
-    currentText[MAX_TEXT_LENGTH - 1] = '\0';
+    strncpy(currentText, storedText, MAX_TEXT_INPUT_LENGTH - 1);
+    currentText[MAX_TEXT_INPUT_LENGTH - 1] = '\0';
 
     textLength = strlen(currentText);
     cursorPosition = textLength; // Start with cursor at the end of the text
@@ -95,20 +100,45 @@ void inputKeyboard_buildRenderPlan(DisplayRenderPlan *renderPlan) {
     buildKeyboardScene(renderPlan);
 }
 
-void inputKeyboard_handleInput(InputEventData event) {
+InputKeyboardResult inputKeyboard_handleInput(InputEventData event) {
+    InputKeyboardResult result = {0};
+
+    strncpy(result.text, currentText, sizeof(result.text) - 1);
+    result.text[sizeof(result.text) - 1] = '\0';
+    
     switch (event.buttonType) {
         case BUTTON_EVENT_TYPE_ROTARY_ENCODER_UP:
+            result.type = INPUT_KEY_ACTION_TYPE_CURSOR_MOVE;
             activeKeyIndex = (activeKeyIndex + getTotalKeysCountForLayout(currentKeyboardLayout) - 1) % getTotalKeysCountForLayout(currentKeyboardLayout);
             break;
         case BUTTON_EVENT_TYPE_ROTARY_ENCODER_DOWN:
+            result.type = INPUT_KEY_ACTION_TYPE_CURSOR_MOVE;
             activeKeyIndex = (activeKeyIndex + 1) % getTotalKeysCountForLayout(currentKeyboardLayout);
             break;
         case BUTTON_EVENT_TYPE_ROTARY_ENCODER_PRESS:
             confirmUserInput();
+
+            if (keyLookupRegistry[activeKeyIndex].actionKey == KEYBOARD_SPECIAL_KEY_ENTER) {
+                result.type = INPUT_KEY_ACTION_TYPE_CONFIRM;
+                break;
+            } 
+            
+            if (keyLookupRegistry[activeKeyIndex].type == INPUT_KEY_TYPE_ACTION) {
+                result.type = INPUT_KEY_ACTION_TYPE_ACTION;
+                break;
+            }
+
+            if (keyLookupRegistry[activeKeyIndex].type == INPUT_KEY_TYPE_CHARACTER) {
+                result.type = INPUT_KEY_ACTION_TYPE_CHARACTER;
+                break;
+            }
+
             break;
         default:
              ESP_LOGW("InputKeyboard", "Unhandled button event: %d", event.buttonType);
     }
+
+    return result;
 }
 
 void inputKeyboard_setText(const char* newText) {
@@ -116,8 +146,8 @@ void inputKeyboard_setText(const char* newText) {
         return;
     }
 
-    strncpy(currentText, newText, MAX_TEXT_LENGTH - 1);
-    currentText[MAX_TEXT_LENGTH - 1] = '\0';
+    strncpy(currentText, newText, MAX_TEXT_INPUT_LENGTH - 1);
+    currentText[MAX_TEXT_INPUT_LENGTH - 1] = '\0';
 
     textLength = strlen(currentText);
     cursorPosition = textLength; // Start with cursor at the end of the text
@@ -165,11 +195,9 @@ static void setPixelSpace(void) {
 }
 
 static void confirmUserInput() {
-    KeyboardCharacterMap characterMap = getKeyboardCharacterMap(currentKeyboardLayout);
-
     switch (keyLookupRegistry[activeKeyIndex].type) {
         case INPUT_KEY_TYPE_CHARACTER:
-            insertCharacterAtCursor(characterMap.characters[activeKeyIndex]);
+            insertCharacterAtCursor(keyLookupRegistry[activeKeyIndex].character);
             break;
         case INPUT_KEY_TYPE_ACTION:
             handleKeyboardActionKey(keyLookupRegistry[activeKeyIndex].actionKey);
@@ -180,7 +208,7 @@ static void confirmUserInput() {
 }
 
 static void insertCharacterAtCursor(char character) {
-    if (textLength >= MAX_TEXT_LENGTH - 1) {
+    if (textLength >= MAX_TEXT_INPUT_LENGTH - 1) {
         return; // No space to insert new character
      }
 
@@ -213,7 +241,6 @@ static void handleKeyboardActionKey(KeyboardActionKey actionKey) {
             cursorPosition = 0;
             break;
         case KEYBOARD_SPECIAL_KEY_ENTER:
-            // Handle enter key action, e.g., submit the input
             break;
         case KEYBOARD_SPECIAL_KEY_SPACE:
             insertCharacterAtCursor(' ');
@@ -222,7 +249,8 @@ static void handleKeyboardActionKey(KeyboardActionKey actionKey) {
             // Handle shift key action, e.g., toggle between uppercase and lowercase
             break;
         case KEYBOARD_SPECIAL_KEY_MODE:
-            // Handle mode switch, e.g., switch between different keyboard layouts
+            currentKeyboardLayout = layoutModeOrder[(size_t)(currentKeyboardLayout + 1) % ARRAY_SIZE(layoutModeOrder)];
+            rebuildKeyboardLookupRegistry();
             break;
         case KEYBOARD_SPECIAL_KEY_CURSOR_LEFT:
             if (cursorPosition > 0) {

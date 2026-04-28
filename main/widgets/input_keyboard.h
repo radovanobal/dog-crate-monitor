@@ -4,10 +4,24 @@
 #include "../display_types.h"
 #include "../app_event.h"
 
+#define MAX_TEXT_INPUT_LENGTH 65
+
+typedef enum {
+    INPUT_KEY_ACTION_TYPE_CHARACTER,
+    INPUT_KEY_ACTION_TYPE_CURSOR_MOVE,
+    INPUT_KEY_ACTION_TYPE_CONFIRM,
+    INPUT_KEY_ACTION_TYPE_ACTION
+} InputKeyboardActionType;
+
+typedef struct {
+    InputKeyboardActionType type;
+    char text[MAX_TEXT_INPUT_LENGTH];
+} InputKeyboardResult;
+
 void inputKeyboard_init(char* storedText);
 void inputKeyboard_deinit(void);
 void inputKeyboard_buildRenderPlan(DisplayRenderPlan *renderPlan);
-void inputKeyboard_handleInput(InputEventData event);
+InputKeyboardResult inputKeyboard_handleInput(InputEventData event);
 void inputKeyboard_setText(const char* newText);
 char* inputKeyboard_getText(void);
 
