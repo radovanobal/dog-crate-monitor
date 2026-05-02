@@ -15,6 +15,9 @@
 #include "./app_dispatcher.h"
 #include "./button_event.h"
 #include "./screen_manager.h"
+#include "./power_management.h"
+#include "./task_drain_monitor.h"
+#include "./task_drain_events.h"
 
 static void mergeDisplayRequests(DisplayRequest *accumulator, DisplayRequest *candidate);
 static int findRegionInDisplayRequest(const DisplayRequest *request, DisplayRegionId regionId);
@@ -30,17 +33,24 @@ task_manager_error initTaskManager() {
 
     if (displayQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create display queue");
+
         return TASK_MANAGER_FAIL;
     }
+
+    taskDrainMonitor_setTaskQueueToMonitor(displayQueue);
+
 
     appEventQueue = xQueueCreate(10, sizeof(AppEvent));
     if (appEventQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create app event queue");
         vQueueDelete(displayQueue);
         displayQueue = NULL;
+
         return TASK_MANAGER_FAIL;
     }
-    
+
+    taskDrainMonitor_setTaskQueueToMonitor(appEventQueue);
+
     return TASK_MANAGER_SUCCESS;
 }
 
@@ -52,8 +62,11 @@ void uiTask(void *pvParameters) {
             
         if(xQueueReceive(appEventQueue, &event, portMAX_DELAY) != pdPASS) {
             ESP_LOGW(TAG, "Failed to receive app event from queue");
+
             continue;
         }
+
+        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_DRAINING);
 
         ESP_LOGI(TAG, "Received app event of type: %d", event.eventType);
         const AppState *state = appDispatcher_getAppState();
@@ -75,6 +88,7 @@ void uiTask(void *pvParameters) {
                 (unsigned)previousScreenGeneration,
                 (unsigned)screenGeneration
             );
+
             xQueueReset(displayQueue);
         }
 
@@ -85,6 +99,9 @@ void uiTask(void *pvParameters) {
                 TAG, "Screen render not required after handling event of type: %d",
                 event.eventType
             );
+
+            taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_IDLE);
+            
             continue;
         }
 
@@ -93,9 +110,12 @@ void uiTask(void *pvParameters) {
             screenGeneration, 
             &renderResult
         );
+        
+        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_IDLE);
 
         if (xQueueSend(displayQueue, &displayRequest, pdMS_TO_TICKS(10)) != pdTRUE) {
             ESP_LOGW(TAG, "Failed to enqueue display request");
+
             continue;
         }
     }
@@ -108,8 +128,11 @@ void renderTask(void *pvParameters) {
     for(;;) {
         if(xQueueReceive(displayQueue, &renderResult, portMAX_DELAY) != pdPASS) {
             ESP_LOGW(TAG, "Failed to receive display request from queue");
+            
             continue;
         }
+
+        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_RENDER, TASK_DRAIN_STATE_DRAINING);
 
         DisplayRequest candidate;
         DisplayRequest accumulator = renderResult;
@@ -117,6 +140,7 @@ void renderTask(void *pvParameters) {
         for (;;) {
             if (xQueueReceive(displayQueue, &candidate, 0) != pdPASS) {
                 ESP_LOGI(TAG, "No more display requests in queue to merge for this pass");
+
                 break; // queue drained for this pass
             }
 
@@ -128,6 +152,7 @@ void renderTask(void *pvParameters) {
             if (candidate.screenGeneration > accumulator.screenGeneration) {
                 // newer generation invalidates old accumulated work
                 accumulator = candidate;
+
                 continue;
             }
 
@@ -143,10 +168,14 @@ void renderTask(void *pvParameters) {
                 (unsigned)accumulator.screenGeneration,
                 (unsigned)screenGeneration
             );
+
+            taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_RENDER, TASK_DRAIN_STATE_IDLE);
+            
             continue;
         }
 
         screenManager_render(&accumulator);
+        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_RENDER, TASK_DRAIN_STATE_IDLE);
     }
 }
 
@@ -158,8 +187,17 @@ void inputTask(void *pvParameters) {
 
         if (!buttonEvent_wait(&buttonEvent, portMAX_DELAY)) {
             ESP_LOGW(TAG, "Failed to receive button event");
+
             continue;
         }
+
+        if (buttonEvent.buttonType == BUTTON_EVENT_TYPE_POWER) {
+            powerManagement_handlePowerButtonInput(buttonEvent);
+
+            continue; // Power button events are handled separately, do not send to app event queue
+        }
+
+        powerManagement_abortPowerOff(); // any button event should abort power off if it was in progress
 
         AppEvent appEvent = {
             .eventType = APP_EVENT_INPUT_RECEIVED,
@@ -185,6 +223,15 @@ void serviceTask(void *pvParameters) {
     ESP_LOGI(TAG, "Service Task started");
 
     for(;;) {
+        if (powerManagement_isPreparingForPowerOff()) {
+            ESP_LOGI(TAG, "System is preparing for power off, skipping service task operations");
+            vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(100)); // Delay before checking again
+
+            continue;
+        }
+
+        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_SERVICE, TASK_DRAIN_STATE_DRAINING);
+
         enum env_error envStatus = readTemperatureAndHumidity(&stateTemperatureC, &stateRelativeHumidity);
         enum env_error timeStatus = getCurrentTime(&currentTime);
         enum env_error batteryStatus = getBatteryLevel(&batteryLevel);
@@ -193,7 +240,10 @@ void serviceTask(void *pvParameters) {
 
         if (overallStatus == ENV_FAIL) {
             ESP_LOGE(TAG, "Failed to read environment data or time");
+            taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_SERVICE, TASK_DRAIN_STATE_IDLE);
+            
             vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(5000)); // Delay before retrying
+
             continue;
         }
         
@@ -208,6 +258,14 @@ void serviceTask(void *pvParameters) {
             ESP_LOGW(TAG, "Failed to send environment event to queue");
         }
 
+        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_SERVICE, TASK_DRAIN_STATE_IDLE);
+
+        if (powerManagement_isPreparingForPowerOff()) {
+            ESP_LOGI(TAG, "System started preparing for power off during service task operations, skipping delay and checking power off state sooner");
+            
+            continue;
+        }
+
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(delayDuration)); // Delay before the next reading
     }
 }
@@ -219,6 +277,7 @@ static void mergeDisplayRequests(DisplayRequest *accumulator, DisplayRequest *ca
             (unsigned)accumulator->screenGeneration,
             (unsigned)candidate->screenGeneration
         );
+
         return;
     }
 
@@ -230,10 +289,12 @@ static void mergeDisplayRequests(DisplayRequest *accumulator, DisplayRequest *ca
             // region from candidate not in accumulator, add it
             if (accumulator->displayRenderPlan.count >= MAX_RENDER_SCENES) {
                 ESP_LOGW(TAG, "Cannot merge display request: accumulator render plan is full");
+
                 return;
             }
             
             accumulator->displayRenderPlan.regions[accumulator->displayRenderPlan.count++] = *candidateRegion;
+            
             continue;
         }
 

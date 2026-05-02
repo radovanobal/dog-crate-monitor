@@ -2,6 +2,7 @@
 #define AXP_PROT_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef enum axp2101_pwr_tab {
     DC1 = 1,
@@ -11,12 +12,21 @@ typedef enum axp2101_pwr_tab {
     ALDO4,
 } axp2101_pwr_tab_t;
 
+typedef enum {
+    AXP_POWER_KEY_EVENT_NONE = 0,
+    AXP_POWER_KEY_EVENT_SHORT_PRESS,
+    AXP_POWER_KEY_EVENT_LONG_PRESS,
+} AxpPowerKeyEvent;
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
 void axp_init(void);
+bool axp_enablePowerKeyIrq(void);
+AxpPowerKeyEvent axp_readPowerKeyEvent(void);
 void axp2101_getVoltage_Task(void *arg);
 int get_battery_power(void);
 bool gatpwrstate(uint8_t tab);

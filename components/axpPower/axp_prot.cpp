@@ -288,6 +288,37 @@ bool get_usb_connected()
     return axp2101.isVbusIn();
 }
 
+bool axp_enablePowerKeyIrq(void)
+{
+    const uint64_t irqMask =
+        XPOWERS_AXP2101_PKEY_SHORT_IRQ |
+        XPOWERS_AXP2101_PKEY_LONG_IRQ;
+
+    axp2101.clearIrqStatus();
+    return axp2101.enableIRQ(irqMask);
+}
+
+AxpPowerKeyEvent axp_readPowerKeyEvent(void)
+{
+    axp2101.getIrqStatus();
+
+    const bool shortPress = axp2101.isPekeyShortPressIrq();
+    const bool longPress = axp2101.isPekeyLongPressIrq();
+
+    if (shortPress || longPress) {
+        axp2101.clearIrqStatus();
+    }
+
+    if (longPress) {
+        return AXP_POWER_KEY_EVENT_LONG_PRESS;
+    }
+
+    if (shortPress) {
+        return AXP_POWER_KEY_EVENT_SHORT_PRESS;
+    }
+
+    return AXP_POWER_KEY_EVENT_NONE;
+}
 
 #ifdef __cplusplus
 extern "C" {

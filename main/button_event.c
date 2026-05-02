@@ -2,6 +2,7 @@
 #include <stdbool.h>
 
 #include "button_bsp.h"
+#include "button_pmu_bsp.h"
 #include "esp_log.h"
 
 #include "./button_event.h"
@@ -31,9 +32,18 @@ bool buttonEvent_wait(ButtonEvent *event, TickType_t ticksToWait) {
         ticksToWait
     );
 
-    EventBits_t relevantBits = keyEventBits & wakeButtonBits;
+    EventBits_t pmuKeyEventBits = xEventGroupWaitBits(
+        pmu_key_groups,
+        PMU_KEY_BIT_ALL,
+        pdTRUE,
+        pdFALSE,
+        0 // Don't wait, just check the current state
+    );
 
-    if (relevantBits == 0) {
+    EventBits_t relevantBits = keyEventBits & wakeButtonBits;
+    EventBits_t relevantPmuBits = pmuKeyEventBits & PMU_KEY_BIT_ALL;
+
+    if (relevantBits == 0 && relevantPmuBits == 0) {
         return false;
     }
 
@@ -60,6 +70,12 @@ bool buttonEvent_wait(ButtonEvent *event, TickType_t ticksToWait) {
     if (relevantBits & set_bit_button(21)) {
         event->pressType = BUTTON_PRESS_TYPE_SINGLE_CLICK;
         event->buttonType = BUTTON_EVENT_TYPE_BUTTON_SELECT;
+        return true;
+    }
+
+    if (relevantPmuBits & PMU_KEY_BIT_SHORT_PRESS) {
+        event->pressType = BUTTON_PRESS_TYPE_SHORT_PRESS;
+        event->buttonType = BUTTON_EVENT_TYPE_POWER;
         return true;
     }
 

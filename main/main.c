@@ -9,6 +9,7 @@
 #include "./app_dispatcher.h"
 #include "./button_event.h"
 #include "./display_controller.h"
+#include "./power_management.h"
 
 // Log tag
 static const char *TAG = "main";
@@ -18,7 +19,7 @@ static void initCommunications(void);
 void app_main(void)
 {
     initCommunications();
-    
+
     const display_init_error err = displayController_init();
     
     if (err != DISPLAY_SUCCESS) {
@@ -38,6 +39,9 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to initialize task manager");
         return;
     }
+
+    powerManagement_init();
+
 
     if(xTaskCreatePinnedToCore(uiTask, "uiTask", 8192, NULL, 5, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UI task");

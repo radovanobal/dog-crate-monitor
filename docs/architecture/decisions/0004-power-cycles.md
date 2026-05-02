@@ -103,16 +103,53 @@ If the display layer is already rendering, sleep must be blocked until that rend
 
 All other queued work should be dropped rather than carried across the sleep boundary.
 
+### 8. Sleep policy distinguishes manual sleep from passive idle sleep
+
+The power-management module distinguishes at least two deep-sleep entry profiles:
+
+1. Manual sleep, requested explicitly by the user
+2. Passive idle sleep, entered automatically after an interactive idle timeout
+
+Manual sleep is intended to behave like a user-selected off state.
+
+When manual sleep is entered, the device should sleep until a user-input wake source fires.
+
+The intended behavior is that any supported button input may wake the device from deep sleep, subject to the hardware wake capabilities and wiring of the board.
+
+Passive idle sleep is intended to support low-power monitoring.
+
+When passive idle sleep is entered, the device should arm both timer wake and input wake so it can perform periodic bounded monitoring cycles while still allowing immediate return to interactive use.
+
+The intended input-wake policy is that any supported button input may wake the device from deep sleep, subject to the hardware wake capabilities and wiring of the board.
+
+### 9. Sleep preparation blocks background intake, but user input remains authoritative
+
+When the interactive idle timeout expires, the power-management module enters a sleep-preparation phase rather than sleeping immediately.
+
+During sleep preparation:
+
+1. New background work should be blocked, ignored, or dropped
+2. Already accepted in-flight critical work may finish
+3. Already queued work may be drained only to the extent needed to reach a display-safe and sleep-safe state
+
+User input is always authoritative.
+
+If user input arrives during sleep preparation, sleep preparation must be canceled, the idle timer must be reset, and the system must return to interactive behavior.
+
+This means sleep preparation is allowed to suppress background producers, but it must not suppress the user path that cancels the transition.
+
 ## Runtime Model
 
 The intended runtime behavior is:
 
 1. Cold boot starts the interactive runtime unless a later mode-specific policy says otherwise.
 2. User input during interactive runtime resets the idle timer.
-3. If the device is battery-powered, in a sleep-eligible mode, and idle past the configured timeout, sleep preparation begins.
-4. Timer wake runs a passive monitoring cycle.
-5. Input wake returns to interactive behavior.
-6. External power disables automatic deep sleep even if the idle timeout expires.
+3. A manual sleep request enters a manual sleep-preparation path and then deep sleep with input wake enabled.
+4. If the device is battery-powered, in a sleep-eligible mode, and idle past the configured timeout, passive sleep preparation begins.
+5. Passive sleep preparation blocks new background intake, allows the current critical path to reach a sleep-safe state, and is canceled immediately by new user input.
+6. Timer wake runs a bounded passive monitoring cycle: read environment, evaluate whether display work is needed, perform any required render, and return to deep sleep.
+7. Input wake from any supported button returns to interactive behavior and resets the idle timer.
+8. External power disables automatic deep sleep even if the idle timeout expires.
 
 ## Consequences
 
@@ -123,6 +160,7 @@ The intended runtime behavior is:
 3. Timer wake and input wake become easier to reason about because they follow different, intentional paths.
 4. External power behavior becomes consistent for charging, bench use, and debugging.
 5. The architecture remains compatible with both passive monitoring and interactive UI sessions.
+6. Sleep preparation remains responsive because user input cancels the transition rather than being ignored until sleep completes.
 
 ### Tradeoffs
 
@@ -131,6 +169,7 @@ The intended runtime behavior is:
 3. Retained state and wake-cause interpretation become explicit design concerns.
 4. BLE behavior may need a separate policy if continuous availability is required while the device is otherwise trying to save power.
 5. Sleep entry may need to wait for long e-paper refreshes to complete before power can be reduced safely.
+6. Background producers may need explicit gating so passive sleep preparation can stop new nonessential work from entering the pipeline.
 
 ## Rules Derived From This Decision
 
@@ -145,6 +184,12 @@ The intended runtime behavior is:
 9. State required after wake must be explicitly retained or reconstructed; it must not be assumed to survive implicitly in task-local runtime state.
 10. An in-progress display refresh is a hard sleep blocker because sleeping mid-refresh can leave the panel in a clear, recovery, or otherwise corrupted visible state.
 11. Once sleep preparation starts, queued work is dropped unless it represents a display update already in progress that must finish before sleep.
+12. The sleep policy distinguishes manual sleep from passive idle sleep, and those profiles may arm different wake sources.
+13. Passive idle sleep should arm both timer wake and input wake.
+14. Manual sleep should arm input wake and should not require periodic timer wake.
+15. The intended input-wake policy is that any supported button input may wake the device from deep sleep, subject to hardware wake capabilities and board wiring.
+16. Sleep preparation may block new background work from entering the pipeline, but it must not block user input from canceling the transition.
+17. User input received during sleep preparation cancels sleep preparation and resets the interactive idle timer.
 
 ## Implementation Direction
 
@@ -159,6 +204,9 @@ The expected refactor direction is:
 7. Evolve periodic environment update logic toward a bounded passive cycle for timer-wake operation
 8. Expose a display-safe-to-sleep signal or equivalent display-busy state so power management can block sleep until the panel update is complete
 9. Purge non-display-in-progress queued work when sleep preparation begins instead of carrying it across the sleep boundary
+10. Add explicit sleep profiles for manual sleep and passive idle sleep, including different wake-source configuration for each profile
+11. Gate background event producers during sleep preparation while keeping the user-input path able to cancel the transition
+12. Replace vague queue-empty checks with explicit sleep blockers and a bounded pipeline-drain policy
 
 ## Alternatives Considered
 
