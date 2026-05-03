@@ -8,7 +8,6 @@
 #include "generated_icons.h"
 #include "display_types.h"
 
-
 void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color);
 void paintBoxGrid(BoxGridData gridData);
 

@@ -97,7 +97,7 @@ typedef enum {
 typedef struct {
     uint8_t columnSpan;
     bool isActive;
-    char text[8];
+    char text[16];
 } BoxGridCellData;
 
 typedef struct {

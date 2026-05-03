@@ -3,15 +3,14 @@
 #include "GUI_Paint.h"
 #include "epaper_port.h"
 
-#include "input_keyboard.h"
-#include "display_types.h"
-#include "keyboard_char_map.h"
-#include "screen_layout.h"
-#include "screen_render.h"
-#include "screen_types.h"
-#include "app_event.h"
+#include "screen/screen_layout.h"
+#include "screen/screen_render.h"
+#include "screen/screen_types.h"
+#include "display/display_types.h"
+#include "app/app_event.h"
 #include "utils/macros.h"
-
+#include "input_keyboard.h"
+#include "keyboard_char_map.h"
 
 typedef enum {
     INPUT_KEY_TYPE_CHARACTER = 0,
@@ -329,7 +328,7 @@ static PixelRenderItem createKeyboardButtonsRenderItem() {
                 .colorDefault = DISPLAY_COLOR_WHITE,
                 .rows = 5,
                 .columns = 14,
-                .cells = {0} // Cell data will be populated dynamically based on the keyboard layout
+                .cells = {{0}} // Cell data will be populated dynamically based on the keyboard layout
             }
         }
     };
