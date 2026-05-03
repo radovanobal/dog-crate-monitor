@@ -197,7 +197,7 @@ void inputTask(void *pvParameters) {
             continue; // Power button events are handled separately, do not send to app event queue
         }
 
-        powerManagement_abortPowerOff(); // any button event should abort power off if it was in progress
+        powerManagement_abortTaskSuspend(); // any button event should abort power off if it was in progress
 
         AppEvent appEvent = {
             .eventType = APP_EVENT_INPUT_RECEIVED,
@@ -223,8 +223,8 @@ void serviceTask(void *pvParameters) {
     ESP_LOGI(TAG, "Service Task started");
 
     for(;;) {
-        if (powerManagement_isPreparingForPowerOff()) {
-            ESP_LOGI(TAG, "System is preparing for power off, skipping service task operations");
+        if (powerManagement_isPreparingForTaskSuspension()) {
+            ESP_LOGI(TAG, "System is preparing for task suspension, skipping service task operations");
             vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(100)); // Delay before checking again
 
             continue;
@@ -260,8 +260,8 @@ void serviceTask(void *pvParameters) {
 
         taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_SERVICE, TASK_DRAIN_STATE_IDLE);
 
-        if (powerManagement_isPreparingForPowerOff()) {
-            ESP_LOGI(TAG, "System started preparing for power off during service task operations, skipping delay and checking power off state sooner");
+        if (powerManagement_isPreparingForTaskSuspension()) {
+            ESP_LOGI(TAG, "System started preparing for task suspension during service task operations, skipping delay and checking task suspension state sooner");
             
             continue;
         }

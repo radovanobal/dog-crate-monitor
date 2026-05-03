@@ -15,7 +15,8 @@ static const EventBits_t wakeButtonBits = set_bit_button(2)
     | set_bit_button(21);
 
 void buttonEvent_init(void) {
-    button_Init();    
+    button_Init();
+    buttonPmuBsp_init();    
 }
 
 bool buttonEvent_wait(ButtonEvent *event, TickType_t ticksToWait) {
@@ -37,7 +38,7 @@ bool buttonEvent_wait(ButtonEvent *event, TickType_t ticksToWait) {
         PMU_KEY_BIT_ALL,
         pdTRUE,
         pdFALSE,
-        0 // Don't wait, just check the current state
+        10
     );
 
     EventBits_t relevantBits = keyEventBits & wakeButtonBits;
@@ -75,6 +76,12 @@ bool buttonEvent_wait(ButtonEvent *event, TickType_t ticksToWait) {
 
     if (relevantPmuBits & PMU_KEY_BIT_SHORT_PRESS) {
         event->pressType = BUTTON_PRESS_TYPE_SHORT_PRESS;
+        event->buttonType = BUTTON_EVENT_TYPE_POWER;
+        return true;
+    }
+
+    if (relevantPmuBits & PMU_KEY_BIT_LONG_PRESS) {
+        event->pressType = BUTTON_PRESS_TYPE_LONG_PRESS;
         event->buttonType = BUTTON_EVENT_TYPE_POWER;
         return true;
     }

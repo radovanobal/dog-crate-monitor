@@ -6,7 +6,7 @@
 
 void powerManagement_init(void);
 void powerManagement_handlePowerButtonInput(ButtonEvent buttonEvent);
-void powerManagement_abortPowerOff(void);
-bool powerManagement_isPreparingForPowerOff(void);
+void powerManagement_abortTaskSuspend(void);
+bool powerManagement_isPreparingForTaskSuspension(void);
 
 #endif // DOG_CRATE_MONITOR_POWER_MANAGEMENT_H
