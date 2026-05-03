@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "test_app_main.c"
+        "test_utils.c"
+        "../../main/utils/utils.c"
+    INCLUDE_DIRS
+        "."
+        "../../main"
+    PRIV_REQUIRES
+        unity
+    WHOLE_ARCHIVE
+)
