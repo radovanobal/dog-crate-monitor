@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 
-#include "./app_event.h"
-#include "./app_store.h"
-#include "./screen_types.h"
+#include "app/app_event.h"
+#include "app/app_store.h"
+#include "screen/screen_types.h"
 
 typedef enum {
     SCREEN_PURPOSE_NAVIGATION = 0,

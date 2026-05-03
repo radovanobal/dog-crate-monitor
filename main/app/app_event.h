@@ -1,8 +1,8 @@
 #ifndef DOG_CRATE_MONITOR_APP_EVENT_H
 #define DOG_CRATE_MONITOR_APP_EVENT_H
 
-#include "./environment_types.h"
-#include "./button_event.h"
+#include "environment_types.h"
+#include "button_event.h"
 
 typedef enum {
     APP_EVENT_ENVIRONMENT_UPDATED = 0,

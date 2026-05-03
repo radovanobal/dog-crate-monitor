@@ -1,6 +1,5 @@
-#include "screen_layout.h"
-#include "display_types.h"
-
+#include "display/display_types.h"
+#include "screen/screen_layout.h"
 
 ScreenLayout initRenderGrid(const struct GridConfig gridConfig)
 {

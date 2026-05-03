@@ -5,14 +5,15 @@
 #include "esp_log.h"
 #include "epaper_port.h"
 
-#include "display_types.h"
+#include "app/app_event.h"
+#include "display/display_types.h"
+#include "screen/screen_render.h"
+#include "screen/screen_layout.h"
+#include "screen/screen_types.h"
 #include "list_navigation.h"
 #include "button_event.h"
 #include "font.h"
-#include "screen_render.h"
-#include "screen_layout.h"
-#include "screen_types.h"
-#include "app_event.h"
+
 
 #define MAX_MENU_ITEMS 12
 #define MAX_VISIBLE_MENU_ITEMS 6

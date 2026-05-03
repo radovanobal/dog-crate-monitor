@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "../display_types.h"
-#include "../app_event.h"
+#include "app/app_event.h"
+#include "display/display_types.h"
 
 typedef uint16_t ListItemId;
 

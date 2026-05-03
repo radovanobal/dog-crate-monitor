@@ -1,9 +1,10 @@
 #ifndef DOG_CRATE_MONITOR_APP_STORE_H
 #define DOG_CRATE_MONITOR_APP_STORE_H
 
-#include "./environment_types.h"
-#include "./screen_types.h"
 #include <stdbool.h>
+
+#include "environment_types.h"
+#include "screen/screen_types.h"
 
 typedef struct {
     TimeDate currentTime;

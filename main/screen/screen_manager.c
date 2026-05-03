@@ -1,14 +1,14 @@
 #include "esp_log.h"
 
-#include "./screen_manager.h"
-#include "./screen_types.h"
-#include "./display_controller.h"
-#include "./app_event.h"
-#include "./app_store.h"
-#include "./utils/macros.h"
-#include "./screens/home_screen.h"
-#include "./screens/menu_screen.h"
-#include "./screens/settings_screen.h"
+#include "app/app_event.h"
+#include "app/app_store.h"
+#include "display/display_controller.h"
+#include "screen/screen_manager.h"
+#include "screen/screen_types.h"
+#include "screens/home_screen.h"
+#include "screens/menu_screen.h"
+#include "screens/settings_screen.h"
+#include "utils/macros.h"
 
 static void handleInputEvent(const AppEvent *event, const AppState *state, ScreenActionResult *result);
 static ScreenRegistration createScreenRegistration(ScreenId id, const ScreenInterface *interface);

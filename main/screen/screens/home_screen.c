@@ -1,18 +1,20 @@
+#include <sys/stat.h>
+
 #include "esp_log.h"
 #include "epaper_port.h"
 
-#include "../environment_types.h"
-#include "../display_types.h"
-#include "../app_event.h"
-#include "../app_store.h"
-#include "../screen_manager.h"
-#include "../screen_layout.h"
-#include "../screen_render.h"
-#include "../utils/macros.h"
-#include "screen_types.h"
-#include "../screens/home_screen.h"
-#include "../generated_icons.h"
-#include <sys/stat.h>
+#include "app/app_event.h"
+#include "app/app_store.h"
+#include "display/display_types.h"
+#include "screen/screen_manager.h"
+#include "screen/screen_layout.h"
+#include "screen/screen_render.h"
+#include "screen/screen_types.h"
+#include "screen/screens/home_screen.h"
+#include "generated_icons.h"
+#include "utils/macros.h"
+#include "environment_types.h"
+
 
 typedef struct {
     struct {

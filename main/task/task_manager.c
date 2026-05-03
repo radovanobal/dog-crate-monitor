@@ -1,23 +1,24 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "display_types.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
 #include "freertos/task.h"
 #include "freertos/queue.h"
 
-#include "./task_manager.h"
-#include "./utils.h"
-#include "./environment_types.h"
-#include "./environment.h"
-#include "./app_event.h"
-#include "./app_dispatcher.h"
-#include "./button_event.h"
-#include "./screen_manager.h"
-#include "./power_management.h"
-#include "./task_drain_monitor.h"
-#include "./task_drain_events.h"
+#include "app/app_event.h"
+#include "app/app_dispatcher.h"
+#include "display/display_types.h"
+#include "screen/screen_manager.h"
+#include "utils/utils.h"
+#include "task/task_drain_monitor.h"
+#include "task/task_drain_events.h"
+#include "task/task_manager.h"
+#include "button_event.h"
+#include "environment_types.h"
+#include "environment.h"
+#include "power_management.h"
+
 
 static void mergeDisplayRequests(DisplayRequest *accumulator, DisplayRequest *candidate);
 static int findRegionInDisplayRequest(const DisplayRequest *request, DisplayRegionId regionId);

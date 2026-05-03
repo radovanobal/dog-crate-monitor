@@ -1,7 +1,8 @@
 #include "GUI_Paint.h"
 
+
+#include "display/display_types.h"
 #include "screen_render.h"
-#include "display_types.h"
 #include "generated_icons.h"
 
 PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font) {

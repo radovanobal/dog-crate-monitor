@@ -1,7 +1,7 @@
 #ifndef DOG_CRATE_MONITOR_SCREEN_LAYOUT_H
 #define DOG_CRATE_MONITOR_SCREEN_LAYOUT_H
 
-#include "display_types.h"
+#include "display/display_types.h"
 
 typedef struct {
     int cellWidth;

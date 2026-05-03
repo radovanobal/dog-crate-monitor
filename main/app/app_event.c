@@ -1,4 +1,4 @@
-#include "./app_event.h"
+#include "app_event.h"
 
 
 AppEvent appEvent_createEnvironmentUpdateEvent(float temperatureC, float relativeHumidity, int batteryLevel, TimeDate currentTime) {

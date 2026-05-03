@@ -1,10 +1,10 @@
 #ifndef DOG_CRATE_MONITOR_APP_DISPATCHER_H
 #define DOG_CRATE_MONITOR_APP_DISPATCHER_H
 
-#include "./environment_types.h"
-#include "./app_event.h"
-#include "./app_store.h"
-#include "./screen_manager.h"
+#include "app/app_event.h"
+#include "app/app_store.h"
+#include "screen/screen_manager.h"
+#include "environment_types.h"
 
 void appDispatcher_init();
 void appDispatcher_dispatchEvent(const AppEvent *event);

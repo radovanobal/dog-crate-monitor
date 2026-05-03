@@ -4,12 +4,12 @@
 #include "esp_log.h"
 #include "i2c_bsp.h"
 
-#include "./environment.h"
-#include "./task_manager.h"
-#include "./app_dispatcher.h"
-#include "./button_event.h"
-#include "./display_controller.h"
-#include "./power_management.h"
+#include "app/app_dispatcher.h"
+#include "display/display_controller.h"
+#include "task/task_manager.h"
+#include "button_event.h"
+#include "environment.h"
+#include "power_management.h"
 
 // Log tag
 static const char *TAG = "main";

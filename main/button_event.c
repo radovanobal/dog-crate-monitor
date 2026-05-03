@@ -5,7 +5,7 @@
 #include "button_pmu_bsp.h"
 #include "esp_log.h"
 
-#include "./button_event.h"
+#include "button_event.h"
 
 // Log tag
 static const char *TAG = "button_event";

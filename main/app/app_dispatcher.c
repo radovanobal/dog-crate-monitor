@@ -1,5 +1,5 @@
-#include "./app_dispatcher.h"
-#include "./app_store.h"
+#include "app_dispatcher.h"
+#include "app_store.h"
 
 AppState appState;
 

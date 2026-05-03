@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "./display_types.h"
+#include "display/display_types.h"
 
 typedef uint32_t ScreenGeneration;
 

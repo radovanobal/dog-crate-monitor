@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "./environment_types.h"
+#include "environment_types.h"
 
 int getReadTryCount(void);
 enum env_error initEnvironment(void);

@@ -2,13 +2,13 @@
 
 #include "epaper_port.h"
 
+#include "display/display_types.h"
+#include "screen/screen_manager.h"
+#include "screen/screen_types.h"
+#include "screen/screen_layout.h"
+#include "utils/macros.h"
+#include "widgets/list_navigation.h"
 #include "menu_screen.h"
-#include "../screen_manager.h"
-#include "../screen_types.h"
-#include "../screen_layout.h"
-#include "../display_types.h"
-#include "../utils/macros.h"
-#include "../widgets/list_navigation.h"
 
 static const char *TAG = "menu_screen";
 

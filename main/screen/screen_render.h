@@ -3,7 +3,7 @@
 
 #include "GUI_Paint.h"
 
-#include "display_types.h"
+#include "display/display_types.h"
 #include "generated_icons.h"
 
 

@@ -5,8 +5,8 @@
 #include "pcf85063_bsp.h"
 #include "axp_prot.h"
 
-#include "./environment_types.h"
-#include "./environment.h"
+#include "environment_types.h"
+#include "environment.h"
 
 // Log tag
 static const char *TAG = "environment";

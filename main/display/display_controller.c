@@ -4,12 +4,12 @@
 #include "epaper_port.h"
 #include "GUI_Paint.h"
 
-#include "./display_controller.h"
-#include "./display_types.h"
-#include "./display_pipeline_mono.h"
-#include "./display_pipeline_gray4.h"
-#include "./screen_types.h"
-#include "./generated_icons.h"
+#include "display_controller.h"
+#include "display_types.h"
+#include "display_pipeline_mono.h"
+#include "display_pipeline_gray4.h"
+#include "screen/screen_types.h"
+#include "generated_icons.h"
 
 typedef struct {
     RenderRegionScene scenes[MAX_RENDER_SCENES];

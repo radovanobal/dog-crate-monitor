@@ -4,9 +4,9 @@
 #include "esp_log.h"
 #include "esp_sleep.h"
 
-#include "power_management.h"
+#include "task/task_drain_events.h"
 #include "button_event.h"
-#include "task_drain_events.h"
+#include "power_management.h"
 
 static const char *TAG = "power_management";
 
