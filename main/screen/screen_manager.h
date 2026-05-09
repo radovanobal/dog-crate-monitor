@@ -25,12 +25,17 @@ typedef struct {
     ScreenIntent screenIntent;
 } ScreenActionResult;
 
+typedef enum {
+    DISPLAY_PREPARE_REQUEST_SKIPPED = 0,
+    DISPLAY_PREPARE_REQUEST_READY = 1,
+} DisplayPrepareRequest;
+
 typedef struct {
     ScreenPurpose purpose;
     void (*init)(const AppState *appState);
     void (*deinit)(void);
     ScreenActionResult (*handleEvent)(const AppEvent *event, const AppState *appState);
-    ScreenRenderResult (*evaluateDisplay)(const AppState *appState);
+    DisplayPrepareRequest (*evaluateDisplay)(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType);
 } ScreenInterface;
 
 typedef struct {
@@ -40,8 +45,7 @@ typedef struct {
 } ScreenRegistration;
 
 ScreenActionResult screenManager_handleEvent(const AppEvent *event, const AppState *appState);
-ScreenRenderResult screenManager_evaluateDisplay(const AppState *appState);
-DisplayRequest screenManager_buildDisplayRequest(ScreenId screenId, ScreenGeneration screenGeneration, const ScreenRenderResult *renderResult);
+DisplayPrepareRequest screenManager_buildDisplayRequest(const AppState *state, ScreenId screenId, ScreenGeneration screenGeneration, DisplayRequest *displayRequest);
 void screenManager_render(DisplayRequest *displayRequest);
 
 #endif //DOG_CRATE_MONITOR_SCREEN_MANAGER_H

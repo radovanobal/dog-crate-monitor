@@ -87,7 +87,10 @@ void inputKeyboard_init(char* storedText) {
 }
 
 void inputKeyboard_deinit(void) {
-    // No dynamic memory to free in this implementation
+        memset(currentText, 0, sizeof(currentText));
+        activeKeyIndex = 0;
+        cursorPosition = 0;
+        textLength = 0;
 }
 
 void inputKeyboard_buildRenderPlan(DisplayRenderPlan *renderPlan) {
@@ -209,7 +212,7 @@ static void confirmUserInput() {
 static void insertCharacterAtCursor(char character) {
     if (textLength >= MAX_TEXT_INPUT_LENGTH - 1) {
         return; // No space to insert new character
-     }
+    }
 
     // Shift characters to the right of the cursor to make space for the new character
     for (size_t i = textLength; i > cursorPosition; i--) {

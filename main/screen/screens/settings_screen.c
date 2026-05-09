@@ -14,8 +14,10 @@ static void deinitDisplay(void);
 static void initMenuItems(const AppState *state);
 static void initRenderRegions(void);
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *state);
-static ScreenRenderResult evaluateDisplay(const AppState *state);
-static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state);
+static DisplayPrepareRequest evaluateDisplay(const AppState *state, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType);
+static void buildDisplayRenderPlan(const AppState *state, DisplayRenderPlan *displayRenderPlan);
+
+static const char *TAG = "settings_screen";
 
 static MenuState menuState = {0};
 static ScreenLayout screenLayout;
@@ -141,21 +143,20 @@ static void markActiveMenuItem(const AppState *state) {
     }
 }
 
-static ScreenRenderResult evaluateDisplay(const AppState *state) {
+static DisplayPrepareRequest evaluateDisplay(const AppState *state, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType) {
     markActiveMenuItem(state);
     listNavigation_setActiveItem(state->sharedState.navigationState.lastNonMenuScreen);
-    DisplayRenderPlan displayRenderPlan = buildDisplayRenderPlan(state);
+    buildDisplayRenderPlan(state, renderPlan);
+    *pipelineType = DISPLAY_PIPELINE_TYPE_MONO;
 
-    return (ScreenRenderResult){
-        .displayRenderPlan = displayRenderPlan,
-        .pipelineType = DISPLAY_PIPELINE_TYPE_MONO
-    };
+    if (renderPlan->count == 0) {
+        ESP_LOGI(TAG, "No changes detected in display data, skipping render");
+        return DISPLAY_PREPARE_REQUEST_SKIPPED;
+    }
+
+    return DISPLAY_PREPARE_REQUEST_READY;
 }
 
-static DisplayRenderPlan buildDisplayRenderPlan(const AppState *state) {
-    DisplayRenderPlan displayRenderPlan = {0};
-
-    listNavigation_buildRenderPlan(&displayRenderPlan);
-
-    return displayRenderPlan;
+static void buildDisplayRenderPlan(const AppState *state, DisplayRenderPlan *displayRenderPlan) {
+    listNavigation_buildRenderPlan(displayRenderPlan);
 }
