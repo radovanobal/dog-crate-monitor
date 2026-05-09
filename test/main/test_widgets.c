@@ -6,8 +6,7 @@
 
 TEST_CASE("Input keyboard initializes with current text as a null pointer", "[widgets]")
 {
-    char currentText[MAX_TEXT_INPUT_LENGTH] = {0};
-    inputKeyboard_init(currentText);
+    inputKeyboard_init(NULL);
     TEST_ASSERT_TRUE(true); // If we reached this point without crashing, the test passes
     inputKeyboard_deinit();
 }
