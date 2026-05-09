@@ -214,8 +214,8 @@ static void insertCharacterAtCursor(char character) {
         return; // No space to insert new character
     }
 
-    // Shift characters to the right of the cursor to make space for the new character
-    for (size_t i = textLength; i > cursorPosition; i--) {
+    // Shift characters, including the trailing '\0', to keep the string terminated.
+    for (size_t i = textLength + 1; i > cursorPosition; i--) {
         currentText[i] = currentText[i - 1];
     }
 
