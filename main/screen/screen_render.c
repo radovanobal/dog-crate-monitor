@@ -5,7 +5,7 @@
 #include "screen_render.h"
 #include "generated_icons.h"
 
-PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font) {
+PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const char text[64], sFONT *font) {
     PixelRenderItem renderItem = (PixelRenderItem){
         .type = RENDER_ITEM_TYPE_TEXT,
         .data = {
@@ -21,7 +21,7 @@ PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const c
     return renderItem;
 }
 
-PixelRenderItem createTextUnderlineRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font, DOT_PIXEL thickness) {
+PixelRenderItem createTextUnderlineRenderItem(struct PixelCoordinates2D position, const char text[64], sFONT *font, DOT_PIXEL thickness) {
     PixelRenderItem renderItem = (PixelRenderItem) {
         .type = RENDER_ITEM_TYPE_LINE,
         .data = {
@@ -50,9 +50,25 @@ PixelRenderItem createLineSeparatorRenderItem(struct PixelCoordinates2D start, s
             .line = {
                 .start = start,
                 .end = end,
-                .color = DISPLAY_COLOR_GRAY1, // Gray
+                .color = DISPLAY_COLOR_GRAY1, // Dark Gray
                 .thickness = DOT_PIXEL_1X1,
                 .style = LINE_STYLE_SOLID  
+            }
+        }
+    };
+    return renderItem;
+}
+
+PixelRenderItem createBoxItem(struct PixelCoordinates2D position, struct PixelSize2D size, DOT_PIXEL thickness, DRAW_FILL fillType) {
+    PixelRenderItem renderItem = (PixelRenderItem) {
+        .type = RENDER_ITEM_TYPE_RECT,
+        .data = {
+            .rect = {
+                .position = position,
+                .size = size,
+                .color = DISPLAY_COLOR_GRAY1, // Dark Gray
+                .thickness = thickness,
+                .fillType = fillType
             }
         }
     };

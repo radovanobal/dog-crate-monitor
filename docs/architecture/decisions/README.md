@@ -8,6 +8,7 @@ This directory contains architecture decision records for the display, screen, a
 2. [ADR 0002: Screen Transition and Render Invalidation Policy](0002-screen-transition-render-invalidation.md)
 3. [ADR 0003: Generation-Scoped Render Coalescing](0003-generation-scoped-render-coalescing.md)
 4. [ADR 0004: Power Cycles and Sleep-Wake Ownership](0004-power-cycles.md)
+5. [ADR 0005: Display Request Queue Ownership and Storage](0005-display-request-queue-ownership.md)
 
 ## Related Documents
 

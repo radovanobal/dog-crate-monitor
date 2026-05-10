@@ -36,7 +36,7 @@ typedef struct {
 typedef struct {
     DisplayRenderPlan displayRenderPlan;
     DisplayPipelineType pipelineType;
-} ScreenRenderResult;
+} ScreenRenderRequest;
 
 typedef struct {
     char text[16];

@@ -24,10 +24,10 @@ typedef struct {
         int batteryLevel;
     } data;
     struct {
-        char clockText[16];
-        char temperatureText[16];
-        char humidityText[16];
-        char batteryLevelText[16];
+        char clockText[64];
+        char temperatureText[64];
+        char humidityText[64];
+        char batteryLevelText[64];
     } derived;
 } HomeScreenState;
 
@@ -81,9 +81,9 @@ static void initRenderRegions(void);
 static void deinitDisplay(void);
 static void derivedStateFromAppState(const AppState *appState);
 static void determineDirtyRegions(void);
-static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState);
+static void buildDisplayRenderPlan(const AppState *appState, DisplayRenderPlan *displayRenderPlan);
 static ScreenActionResult handleEvent(const AppEvent *event, const AppState *appState);
-static ScreenRenderResult evaluateDisplay(const AppState *appState);
+static DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType);
 static bool isTimeDateEqual(TimeDate t1, TimeDate t2);
 static PixelRenderItem createClockRenderItem(const AppState *appState);
 static PixelRenderItem createTemperatureRenderItem(const AppState *appState);
@@ -124,9 +124,7 @@ static ScreenActionResult handleEvent(const AppEvent *event, const AppState *app
     return result;
 }
 
-static ScreenRenderResult evaluateDisplay(const AppState *appState) {
-    ScreenRenderResult result = {0};
-
+static DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType) {
     nextScreenState.data.currentTime = appState->sharedState.environmentState.currentTime;
     nextScreenState.data.temperatureC = appState->sharedState.environmentState.temperatureC;
     nextScreenState.data.relativeHumidity = appState->sharedState.environmentState.relativeHumidity;
@@ -135,13 +133,17 @@ static ScreenRenderResult evaluateDisplay(const AppState *appState) {
     derivedStateFromAppState(appState);
     determineDirtyRegions();
 
-    DisplayRenderPlan displayRenderPlan = buildDisplayRenderPlan(appState);
-
-    result.displayRenderPlan = displayRenderPlan;
-    result.pipelineType = DISPLAY_PIPELINE_TYPE_MONO;
+    buildDisplayRenderPlan(appState, renderPlan);
+    *pipelineType = DISPLAY_PIPELINE_TYPE_MONO;
 
     homeScreenState = nextScreenState;
-    return result;
+
+    if (renderPlan->count == 0) {
+        ESP_LOGI(TAG, "No changes detected in display data, skipping render");
+        return DISPLAY_PREPARE_REQUEST_SKIPPED;
+    }
+
+    return DISPLAY_PREPARE_REQUEST_READY;
 }
 
 static void derivedStateFromAppState(const AppState *appState) {
@@ -197,8 +199,7 @@ static void determineDirtyRegions(void) {
     }
 }
 
-static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
-    DisplayRenderPlan displayRenderPlan = {0};
+static void buildDisplayRenderPlan(const AppState *appState, DisplayRenderPlan *displayRenderPlan) {
     int sceneItemIndex = 0;
 
     if(dirtyDisplayRegions[HOME_REGION_SLOT_CLOCK].isDirty) {
@@ -212,7 +213,7 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             .count = 1
         };
 
-        displayRenderPlan.regions[sceneItemIndex++] = clockScene;
+        displayRenderPlan->regions[sceneItemIndex++] = clockScene;
     }
 
     if (dirtyDisplayRegions[HOME_REGION_SLOT_BATTERY].isDirty) {
@@ -225,7 +226,7 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             },
             .count = 2
         };
-        displayRenderPlan.regions[sceneItemIndex++] = batteryScene;
+        displayRenderPlan->regions[sceneItemIndex++] = batteryScene;
     }
 
     if(dirtyDisplayRegions[HOME_REGION_SLOT_TEMPERATURE].isDirty) {
@@ -238,7 +239,7 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             },
             .count = 2
         };
-        displayRenderPlan.regions[sceneItemIndex++] = temperatureScene;
+        displayRenderPlan->regions[sceneItemIndex++] = temperatureScene;
     }
 
     if(dirtyDisplayRegions[HOME_REGION_SLOT_HUMIDITY].isDirty) {
@@ -251,11 +252,10 @@ static DisplayRenderPlan buildDisplayRenderPlan(const AppState *appState) {
             },
             .count = 2
         };
-        displayRenderPlan.regions[sceneItemIndex++] = humidityScene;
+        displayRenderPlan->regions[sceneItemIndex++] = humidityScene;
     }
 
-    displayRenderPlan.count = sceneItemIndex;
-    return displayRenderPlan;
+    displayRenderPlan->count = sceneItemIndex;
 }
 
 static bool isTimeDateEqual(TimeDate t1, TimeDate t2) {

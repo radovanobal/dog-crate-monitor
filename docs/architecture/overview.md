@@ -12,6 +12,7 @@ Related decisions:
 2. [ADR 0002: Screen Transition and Render Invalidation Policy](decisions/0002-screen-transition-render-invalidation.md)
 3. [ADR 0003: Generation-Scoped Render Coalescing](decisions/0003-generation-scoped-render-coalescing.md)
 4. [ADR 0004: Power Cycles and Sleep-Wake Ownership](decisions/0004-power-cycles.md)
+5. [ADR 0005: Display Request Queue Ownership and Storage](decisions/0005-display-request-queue-ownership.md)
 
 ## Design Goals
 

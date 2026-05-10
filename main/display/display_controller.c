@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "display_custom_paint.h"
 #include "epaper_port.h"
 #include "GUI_Paint.h"
 
@@ -45,9 +46,9 @@ static bool doesScenePlanMatchCache(const DisplayRenderPlan *incomingPlan);
 static bool doesRenderRegionSceneEquals(const RenderRegionScene *left, const RenderRegionScene *right);
 static bool pixelRenderItemEquals(const PixelRenderItem *item1, const PixelRenderItem *item2);
 static bool pixelRegionEquals(const PixelRegion *left, const PixelRegion *right);
+static bool isGridEqual(const PixelRenderItem *left, const PixelRenderItem *right);
 static int findCachedSceneIndexByRegionId(DisplayRegionId regionId);
 static DisplayPaintType determinePaintType(const DisplayRenderPlan *displayRenderPlan, ScreenGeneration screenGeneration);
-static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color);
 
 static const char *TAG = "display_controller";
 
@@ -230,7 +231,6 @@ static int findCachedSceneIndexByRegionId(DisplayRegionId regionId) {
     return -1;
 }
 
-
 static bool pixelRegionEquals(const PixelRegion *left, const PixelRegion *right) {
     return left->x == right->x &&
            left->y == right->y &&
@@ -281,10 +281,48 @@ static bool pixelRenderItemEquals(const PixelRenderItem *left, const PixelRender
             return left->data.icon.position.x == right->data.icon.position.x &&
                    left->data.icon.position.y == right->data.icon.position.y &&
                    left->data.icon.iconId == right->data.icon.iconId;
+        case RENDER_ITEM_TYPE_GRID:
+            return isGridEqual(left, right);
     }
 
 
     return false;
+}
+
+static bool isGridEqual(const PixelRenderItem *left, const PixelRenderItem *right) {
+    bool isGridConfigSame = left->data.grid.position.x == right->data.grid.position.x 
+                            && left->data.grid.position.y == right->data.grid.position.y 
+                            && left->data.grid.size.width == right->data.grid.size.width 
+                            && left->data.grid.size.height == right->data.grid.size.height 
+                            && left->data.grid.colorAccent == right->data.grid.colorAccent 
+                            && left->data.grid.colorDefault == right->data.grid.colorDefault 
+                            && left->data.grid.rows == right->data.grid.rows 
+                            && left->data.grid.columns == right->data.grid.columns;
+
+    if (!isGridConfigSame) {
+        return false;
+    }
+
+    if (left->data.grid.rows * left->data.grid.columns != right->data.grid.rows * right->data.grid.columns) {
+        return false;
+    }
+
+    if (left->data.grid.rows * left->data.grid.columns > MAX_GRID_CELLS) {
+        ESP_LOGE(TAG, "Grid cell count exceeds maximum supported cells. Cannot compare grid equality.");
+        return false;
+    }
+
+    for (size_t i = 0; i < left->data.grid.rows * left->data.grid.columns && i < MAX_GRID_CELLS; i++) {
+        bool areCellsSame = left->data.grid.cells[i].isActive == right->data.grid.cells[i].isActive 
+                            && strcmp(left->data.grid.cells[i].text, right->data.grid.cells[i].text) == 0
+                            && left->data.grid.cells[i].columnSpan == right->data.grid.cells[i].columnSpan;
+
+        if (!areCellsSame) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static void paintRenderPlan() {
@@ -371,24 +409,17 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
                     item->data.icon.iconId), item->data.icon.position, displayPipeline->getColor(DISPLAY_COLOR_BLACK)
                 );
             break;
+        case RENDER_ITEM_TYPE_GRID: {
+            BoxGridData gridData = item->data.grid;
+
+            gridData.colorAccent = displayPipeline->getColor((DisplayColor)item->data.grid.colorAccent);
+            gridData.colorDefault = displayPipeline->getColor((DisplayColor)item->data.grid.colorDefault);
+
+            paintBoxGrid(gridData);
+            break;
+        }
         default:
             ESP_LOGW(TAG, "Unknown render item type: %d", item->type);
-    }
-}
-
-static void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color) {
-    const uint16_t bytesPerRow = icon->bytesPerRow;
-
-    for (uint16_t row = 0; row < icon->height; ++row) {
-        for (uint16_t col = 0; col < icon->width; ++col) {
-            const uint16_t byteIndex = row * bytesPerRow + col / 8;
-            const uint8_t bitMask = (uint8_t)(0x80 >> (col % 8));
-            const bool pixelOn = (icon->bitmap[byteIndex] & bitMask) != 0;
-
-            if (pixelOn) {
-                Paint_SetPixel(position.x + col, position.y + row, color);
-            }
-        }
     }
 }
 

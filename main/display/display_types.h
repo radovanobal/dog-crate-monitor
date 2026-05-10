@@ -9,6 +9,7 @@
 
 #define MAX_RENDER_ITEMS_PER_REGION 4
 #define MAX_RENDER_SCENES 8
+#define MAX_GRID_CELLS 70
 
 struct GridConfig {
     int width;
@@ -72,6 +73,7 @@ typedef enum {
     RENDER_ITEM_TYPE_RECT = 3,
     RENDER_ITEM_TYPE_LINE = 4,
     RENDER_ITEM_TYPE_ICON = 5,
+    RENDER_ITEM_TYPE_GRID = 6
 } RenderItemType;
 
 typedef enum {
@@ -93,11 +95,27 @@ typedef enum {
 } DisplayColor;
 
 typedef struct {
+    uint8_t columnSpan;
+    bool isActive;
+    char text[16];
+} BoxGridCellData;
+
+typedef struct {
+    struct PixelCoordinates2D position;
+    struct PixelSize2D size;
+    BoxGridCellData cells[MAX_GRID_CELLS];
+    uint16_t colorAccent;
+    uint16_t colorDefault;
+    uint8_t rows;
+    uint8_t columns;
+} BoxGridData;
+
+typedef struct {
     RenderItemType type;
     union {
         struct {
             struct PixelCoordinates2D position;
-            char text[32];
+            char text[64];
             sFONT *font;
         } text;
         struct {
@@ -124,6 +142,7 @@ typedef struct {
             DOT_PIXEL thickness;
             LINE_STYLE style;
         } line;
+        BoxGridData grid;
     } data;
 } PixelRenderItem;
 

@@ -1,3 +1,4 @@
+#include "display/display_types.h"
 #include "esp_log.h"
 
 #include "app/app_event.h"
@@ -14,6 +15,7 @@ static void handleInputEvent(const AppEvent *event, const AppState *state, Scree
 static ScreenRegistration createScreenRegistration(ScreenId id, const ScreenInterface *interface);
 static void ensureActiveScreenRegistered(const AppState *state);
 static bool isNonReturnablePurpose(ScreenPurpose purpose);
+static DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType);
 
 static const char *TAG = "screen_manager";
 
@@ -33,17 +35,19 @@ void screenManager_render(DisplayRequest *displayRequest) {
     displayController_requestRender(displayRequest);
 }
 
-DisplayRequest screenManager_buildDisplayRequest(ScreenId screenId, ScreenGeneration screenGeneration, const ScreenRenderResult *renderResult) {    
-    DisplayRequest displayRequest = {
+DisplayPrepareRequest screenManager_buildDisplayRequest(const AppState *state, ScreenId screenId, ScreenGeneration screenGeneration, DisplayRequest *displayRequest) {    
+    *displayRequest = (DisplayRequest){
         .screenId = screenId,
         .screenGeneration = screenGeneration,
-        .displayRenderPlan = renderResult->displayRenderPlan,
-        .pipelineType = renderResult->pipelineType
+        .displayRenderPlan = { .count = 0 },
+        .pipelineType = DISPLAY_PIPELINE_TYPE_MONO
     };
+
+    DisplayPrepareRequest prepareResult = evaluateDisplay(state, &displayRequest->displayRenderPlan, &displayRequest->pipelineType);
 
     lastScreenGeneration = screenGeneration;
 
-    return displayRequest;
+    return prepareResult;
 }
 
 ScreenActionResult screenManager_handleEvent(const AppEvent *event, const AppState *appState) {
@@ -64,10 +68,10 @@ ScreenActionResult screenManager_handleEvent(const AppEvent *event, const AppSta
     return screenResult;
 }
 
-ScreenRenderResult screenManager_evaluateDisplay(const AppState *appState) {
+static DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType) {
     ensureActiveScreenRegistered(appState);
 
-    return registeredScreen.interface->evaluateDisplay(appState);
+    return registeredScreen.interface->evaluateDisplay(appState, renderPlan, pipelineType);
 }
 
 static bool tryGetScreenInterface(ScreenId screenId, const ScreenInterface **outInterface) {

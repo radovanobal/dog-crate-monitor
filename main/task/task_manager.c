@@ -1,5 +1,7 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
@@ -10,6 +12,7 @@
 #include "app/app_dispatcher.h"
 #include "display/display_types.h"
 #include "screen/screen_manager.h"
+#include "screen/screen_types.h"
 #include "utils/utils.h"
 #include "task/task_drain_monitor.h"
 #include "task/task_drain_events.h"
@@ -19,18 +22,37 @@
 #include "environment.h"
 #include "power_management.h"
 
+#define MAX_DISPLAY_REQUEST_SLOTS 3
 
+typedef enum {
+    DISPLAY_REQUEST_SLOT_FREE,
+    DISPLAY_REQUEST_SLOT_BUILDING,
+    DISPLAY_REQUEST_SLOT_QUEUED,
+    DISPLAY_REQUEST_SLOT_RENDERING,
+} DisplayRequestSlotState;
+
+typedef struct {
+    DisplayRequest request;
+    DisplayRequestSlotState state;
+    uint8_t slotId;
+} DisplayRequestSlot;
+
+static void initDisplaySlots();
 static void mergeDisplayRequests(DisplayRequest *accumulator, DisplayRequest *candidate);
+static void freeDisplayRequestSlot(DisplayRequestSlot *slot);
 static int findRegionInDisplayRequest(const DisplayRequest *request, DisplayRegionId regionId);
+static DisplayRequestSlot *getFreeDisplayRequestSlot();
 
 // Log tag
 static const char *TAG = "task_manager";
 
 static QueueHandle_t displayQueue = NULL;
 static QueueHandle_t appEventQueue = NULL;
+static DisplayRequestSlot displayRequestSlots[MAX_DISPLAY_REQUEST_SLOTS];
 
 task_manager_error initTaskManager() {
-    displayQueue = xQueueCreate(10, sizeof(DisplayRequest));
+    initDisplaySlots();
+    displayQueue = xQueueCreate(10, sizeof(DisplayRequestSlot *));
 
     if (displayQueue == NULL) {
         ESP_LOGE(TAG, "Failed to create display queue");
@@ -39,7 +61,6 @@ task_manager_error initTaskManager() {
     }
 
     taskDrainMonitor_setTaskQueueToMonitor(displayQueue);
-
 
     appEventQueue = xQueueCreate(10, sizeof(AppEvent));
     if (appEventQueue == NULL) {
@@ -67,11 +88,18 @@ void uiTask(void *pvParameters) {
             continue;
         }
 
+        DisplayRequestSlot *allocatedSlot = getFreeDisplayRequestSlot();
+
+        if (allocatedSlot == NULL) {
+            ESP_LOGW(TAG, "No free display request slots available. Skipping render for this event.");
+
+            continue;
+        }
+
         taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_DRAINING);
 
         ESP_LOGI(TAG, "Received app event of type: %d", event.eventType);
         const AppState *state = appDispatcher_getAppState();
-        const ScreenGeneration previousScreenGeneration = state->sharedState.navigationState.screenGeneration;
 
         ScreenActionResult actionResult = screenManager_handleEvent(&event, state);
         appDispatcher_dispatchEvent(&event);
@@ -83,100 +111,94 @@ void uiTask(void *pvParameters) {
         const ScreenId activeScreenId = state->sharedState.navigationState.activeScreen;
         const ScreenGeneration screenGeneration = state->sharedState.navigationState.screenGeneration;
 
-        if (screenGeneration != previousScreenGeneration) {
-            ESP_LOGI(TAG,
-                "Screen generation changed from %u to %u. Resetting display queue.",
-                (unsigned)previousScreenGeneration,
-                (unsigned)screenGeneration
-            );
-
-            xQueueReset(displayQueue);
-        }
-
-        ScreenRenderResult renderResult = screenManager_evaluateDisplay(state);
-
-        if (renderResult.displayRenderPlan.count == 0) {
-            ESP_LOGI(
-                TAG, "Screen render not required after handling event of type: %d",
-                event.eventType
-            );
-
-            taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_IDLE);
-            
-            continue;
-        }
-
-        DisplayRequest displayRequest = screenManager_buildDisplayRequest(
+        const DisplayPrepareRequest prepareType = screenManager_buildDisplayRequest(
+            state,
             activeScreenId, 
             screenGeneration, 
-            &renderResult
+            &allocatedSlot->request
         );
-        
-        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_IDLE);
 
-        if (xQueueSend(displayQueue, &displayRequest, pdMS_TO_TICKS(10)) != pdTRUE) {
-            ESP_LOGW(TAG, "Failed to enqueue display request");
+        if (prepareType == DISPLAY_PREPARE_REQUEST_SKIPPED) {
+            ESP_LOGI(TAG, "Display request preparation skipped for screen ID: %d, generation: %u", activeScreenId, (unsigned)screenGeneration);
+           
+            taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_IDLE);
+            freeDisplayRequestSlot(allocatedSlot);
 
             continue;
         }
+
+        allocatedSlot->state = DISPLAY_REQUEST_SLOT_QUEUED;
+
+        if (xQueueSend(displayQueue, &allocatedSlot, pdMS_TO_TICKS(10)) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to enqueue display request");
+            freeDisplayRequestSlot(allocatedSlot);
+        }
+
+        taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_UI, TASK_DRAIN_STATE_IDLE);
     }
 }
 
 void renderTask(void *pvParameters) {
     ESP_LOGI(TAG, "Render Task started");
-    DisplayRequest renderResult;
+    DisplayRequestSlot *renderResultSlot = NULL;
 
     for(;;) {
-        if(xQueueReceive(displayQueue, &renderResult, portMAX_DELAY) != pdPASS) {
+        if(xQueueReceive(displayQueue, &renderResultSlot, portMAX_DELAY) != pdPASS) {
             ESP_LOGW(TAG, "Failed to receive display request from queue");
             
             continue;
         }
 
+        renderResultSlot->state = DISPLAY_REQUEST_SLOT_RENDERING;
         taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_RENDER, TASK_DRAIN_STATE_DRAINING);
 
-        DisplayRequest candidate;
-        DisplayRequest accumulator = renderResult;
-        
+        DisplayRequestSlot *candidateSlot;
+        DisplayRequestSlot *accumulatorRequestSlot = renderResultSlot;
+
         for (;;) {
-            if (xQueueReceive(displayQueue, &candidate, 0) != pdPASS) {
+            if (xQueueReceive(displayQueue, &candidateSlot, 0) != pdPASS) {
                 ESP_LOGI(TAG, "No more display requests in queue to merge for this pass");
 
                 break; // queue drained for this pass
             }
 
-            if (candidate.screenGeneration < accumulator.screenGeneration) {
-                // stale older work, ignore
+            if (candidateSlot->request.screenGeneration < accumulatorRequestSlot->request.screenGeneration) {
+                freeDisplayRequestSlot(candidateSlot); // candidate is stale, free its slot
                 continue;
             }
 
-            if (candidate.screenGeneration > accumulator.screenGeneration) {
+            if (candidateSlot->request.screenGeneration > accumulatorRequestSlot->request.screenGeneration) {
                 // newer generation invalidates old accumulated work
-                accumulator = candidate;
+                freeDisplayRequestSlot(accumulatorRequestSlot); // old accumulated work is stale, free its slot
+                accumulatorRequestSlot = candidateSlot;
+                accumulatorRequestSlot->state = DISPLAY_REQUEST_SLOT_RENDERING;
 
                 continue;
             }
 
-            mergeDisplayRequests(&accumulator, &candidate);
+            mergeDisplayRequests(&accumulatorRequestSlot->request, &candidateSlot->request);
+            freeDisplayRequestSlot(candidateSlot);
         }
 
         const AppState *state = appDispatcher_getAppState();
         const ScreenGeneration screenGeneration = state->sharedState.navigationState.screenGeneration;
 
-        if (accumulator.screenGeneration != screenGeneration) {
+        if (accumulatorRequestSlot->request.screenGeneration != screenGeneration) {
            ESP_LOGE(TAG,
                 "BUG: stale render request generation %u received while active generation is %u",
-                (unsigned)accumulator.screenGeneration,
+                (unsigned)accumulatorRequestSlot->request.screenGeneration,
                 (unsigned)screenGeneration
             );
 
             taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_RENDER, TASK_DRAIN_STATE_IDLE);
+            freeDisplayRequestSlot(accumulatorRequestSlot);
             
             continue;
         }
 
-        screenManager_render(&accumulator);
+        screenManager_render(&accumulatorRequestSlot->request);
         taskDrainMonitor_taskStatusChanged(TASK_DRAIN_TYPE_RENDER, TASK_DRAIN_STATE_IDLE);
+        freeDisplayRequestSlot(accumulatorRequestSlot);
     }
 }
 
@@ -263,11 +285,19 @@ void serviceTask(void *pvParameters) {
 
         if (powerManagement_isPreparingForTaskSuspension()) {
             ESP_LOGI(TAG, "System started preparing for task suspension during service task operations, skipping delay and checking task suspension state sooner");
-            
+
             continue;
         }
 
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(delayDuration)); // Delay before the next reading
+    }
+}
+
+static void initDisplaySlots() {
+    for (size_t i = 0; i < MAX_DISPLAY_REQUEST_SLOTS; i++) {
+        memset(&displayRequestSlots[i].request, 0, sizeof(displayRequestSlots[i].request));
+        displayRequestSlots[i].state = DISPLAY_REQUEST_SLOT_FREE;
+        displayRequestSlots[i].slotId = i;
     }
 }
 
@@ -312,4 +342,30 @@ static int findRegionInDisplayRequest(const DisplayRequest *request, DisplayRegi
     }
 
     return -1;
+}
+
+static DisplayRequestSlot *getFreeDisplayRequestSlot() {
+    for (size_t i = 0; i < MAX_DISPLAY_REQUEST_SLOTS; i++) {
+        DisplayRequestSlot *slot = &displayRequestSlots[i];
+        
+        if (slot->state != DISPLAY_REQUEST_SLOT_FREE) {
+            continue;
+        }
+
+        slot->state = DISPLAY_REQUEST_SLOT_BUILDING;
+        return slot;
+    }
+
+    return NULL;
+}
+
+static void freeDisplayRequestSlot(DisplayRequestSlot *slot) {
+    if (slot->state == DISPLAY_REQUEST_SLOT_FREE) {
+        ESP_LOGW(TAG, "Attempted to free display request slot %d which is already free", slot->slotId);
+
+        return;
+    }
+
+    slot->state = DISPLAY_REQUEST_SLOT_FREE;
+    memset(&slot->request, 0, sizeof(slot->request));
 }
