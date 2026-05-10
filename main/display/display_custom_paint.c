@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdbool.h>
+
 #include "GUI_Paint.h"
+#include "esp_log.h"
 
 #include "screen/screen_layout.h"
 #include "display/display_custom_paint.h"
@@ -13,6 +15,8 @@ typedef struct {
     uint16_t foregroundColor;
     DRAW_FILL fillType;
 } BoxGridCellStyle;
+
+static const char *TAG = "display_custom_paint";
 
 void paintIconToPixelBuffer(const IconBitmap *icon, const struct PixelCoordinates2D position, uint16_t color) {
     const uint16_t bytesPerRow = icon->bytesPerRow;
@@ -48,6 +52,11 @@ void paintBoxGrid(BoxGridData gridData) {
     };
 
 
+    if (gridData.rows * gridData.columns > MAX_GRID_CELLS) {
+        ESP_LOGE(TAG, "Grid cell count exceeds maximum supported cells. Cannot paint grid.");
+        return;
+    }
+
     for (uint8_t row = 0; row < gridData.rows; ++row) {
         for (uint8_t column = 0; column < gridData.columns; ++column) {
             const uint8_t cellIndex = row * gridData.columns + column;
@@ -64,7 +73,7 @@ void paintBoxGrid(BoxGridData gridData) {
         }
     }
 
-    for (size_t i = 0; i < MAX_GRID_CELLS; ++i) {
+    for (size_t i = 0; i < gridData.rows * gridData.columns && i < MAX_GRID_CELLS; ++i) {
         BoxGridCellData cellData = gridData.cells[i];
         int cellColumn = i % gridData.columns;
         int cellRow = i / gridData.columns;

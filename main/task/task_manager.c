@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
