@@ -6,7 +6,7 @@ idf_component_register(
         "screen/screen_manager.c" "screen/screen_layout.c" "screen/screen_render.c"
         "screen/screens/home_screen.c" "screen/screens/menu_screen.c" "screen/screens/settings_screen.c"
         "widgets/list_navigation.c" "widgets/input_keyboard.c" 
-        "task/task_manager.c" "task/task_manager.c" "task/task_drain_monitor.c"
+        "task/task_manager.c" "task/task_drain_monitor.c"
         "utils/utils.c"
         "keyboard_char_map.c"
         "main.c" "environment.c" "button_event.c" "generated_icons.c" "power_management.c"

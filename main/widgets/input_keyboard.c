@@ -1,7 +1,10 @@
 #include <stddef.h>
+#include <stdbool.h>
+#include <string.h>
 
 #include "GUI_Paint.h"
 #include "epaper_port.h"
+#include "esp_log.h"
 
 #include "screen/screen_layout.h"
 #include "screen/screen_render.h"
@@ -76,6 +79,10 @@ void inputKeyboard_init(char* storedText) {
         return;
     }
 
+    if (strlen(storedText) >= MAX_TEXT_INPUT_LENGTH) {
+        ESP_LOGW("InputKeyboard", "Stored text exceeds maximum input length. It will be truncated.");
+    }
+
     strncpy(currentText, storedText, MAX_TEXT_INPUT_LENGTH - 1);
     currentText[MAX_TEXT_INPUT_LENGTH - 1] = '\0';
 
@@ -104,6 +111,7 @@ void inputKeyboard_buildRenderPlan(DisplayRenderPlan *renderPlan) {
 
 InputKeyboardResult inputKeyboard_handleInput(InputEventData event) {
     InputKeyboardResult result = {0};
+    InputKeyboardKey activeKey;
 
     strncpy(result.text, currentText, sizeof(result.text) - 1);
     result.text[sizeof(result.text) - 1] = '\0';
@@ -118,19 +126,21 @@ InputKeyboardResult inputKeyboard_handleInput(InputEventData event) {
             activeKeyIndex = (activeKeyIndex + 1) % getTotalKeysCountForLayout(currentKeyboardLayout);
             break;
         case BUTTON_EVENT_TYPE_ROTARY_ENCODER_PRESS:
+            activeKey = keyLookupRegistry[activeKeyIndex];
+        
             confirmUserInput();
-
-            if (keyLookupRegistry[activeKeyIndex].actionKey == KEYBOARD_SPECIAL_KEY_ENTER) {
-                result.type = INPUT_KEY_ACTION_TYPE_CONFIRM;
-                break;
-            } 
             
-            if (keyLookupRegistry[activeKeyIndex].type == INPUT_KEY_TYPE_ACTION) {
+            if (activeKey.type == INPUT_KEY_TYPE_ACTION) {
+                if (activeKey.actionKey == KEYBOARD_SPECIAL_KEY_ENTER) {
+                    result.type = INPUT_KEY_ACTION_TYPE_CONFIRM;
+                    break;
+                } 
+
                 result.type = INPUT_KEY_ACTION_TYPE_ACTION;
                 break;
             }
 
-            if (keyLookupRegistry[activeKeyIndex].type == INPUT_KEY_TYPE_CHARACTER) {
+            if (activeKey.type == INPUT_KEY_TYPE_CHARACTER) {
                 result.type = INPUT_KEY_ACTION_TYPE_CHARACTER;
                 break;
             }
@@ -146,6 +156,10 @@ InputKeyboardResult inputKeyboard_handleInput(InputEventData event) {
 void inputKeyboard_setText(const char* newText) {
     if (newText == NULL) {
         return;
+    }
+
+    if (strlen(newText) >= MAX_TEXT_INPUT_LENGTH) {
+        ESP_LOGW("InputKeyboard", "New text exceeds maximum input length. It will be truncated.");
     }
 
     strncpy(currentText, newText, MAX_TEXT_INPUT_LENGTH - 1);
@@ -165,12 +179,16 @@ static void rebuildKeyboardLookupRegistry() {
     KeyboardCharacterMap characterMap = getKeyboardCharacterMap(currentKeyboardLayout);
     KeyboardActionKeysMap actionKeysMap = getKeyboardActionKeysMap(currentKeyboardLayout);
 
-    for (size_t i = 0; i < characterMap.count; i++) {
+    if (characterMap.count + actionKeysMap.count > MAX_GRID_CELLS) {
+        ESP_LOGW("InputKeyboard", "Total keys count for current layout exceeds maximum grid cells. Some keys will not be registered in the lookup registry.");
+    }
+
+    for (size_t i = 0; i < characterMap.count && i < MAX_GRID_CELLS; i++) {
         keyLookupRegistry[i].type = INPUT_KEY_TYPE_CHARACTER;
         keyLookupRegistry[i].character = characterMap.characters[i];
     }
 
-    for (size_t i = 0; i < actionKeysMap.count; i++) {
+    for (size_t i = 0; i < actionKeysMap.count && (characterMap.count + i) < MAX_GRID_CELLS; i++) {
         const size_t cellIndex = characterMap.count + i;
 
         keyLookupRegistry[cellIndex].type = INPUT_KEY_TYPE_ACTION;
@@ -321,6 +339,15 @@ static void buildKeyboardScene(DisplayRenderPlan *displayRenderPlan) {
 }
 
 static PixelRenderItem createKeyboardButtonsRenderItem() {
+    const size_t columns = 14;
+    const size_t rows = 5;
+
+    if (columns * rows > MAX_GRID_CELLS) {
+        ESP_LOGE("InputKeyboard", "Grid configuration exceeds maximum grid cells. Some keys may not be rendered.");
+        PixelRenderItem emptyRenderItem = {0};
+        return emptyRenderItem;
+    }
+
     PixelRenderItem renderItem = {
         .type = RENDER_ITEM_TYPE_GRID,
         .data = {
@@ -329,8 +356,8 @@ static PixelRenderItem createKeyboardButtonsRenderItem() {
                 .size = (struct PixelSize2D){ .width = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.width, .height = inputKeyboardRegions[DISPLAY_REGION_SLOT_KEYBOARD].pixelRegion.height },
                 .colorAccent = DISPLAY_COLOR_BLACK,
                 .colorDefault = DISPLAY_COLOR_WHITE,
-                .rows = 5,
-                .columns = 14,
+                .rows = rows,
+                .columns = columns,
                 .cells = {{0}} // Cell data will be populated dynamically based on the keyboard layout
             }
         }

@@ -303,7 +303,16 @@ static bool isGridEqual(const PixelRenderItem *left, const PixelRenderItem *righ
         return false;
     }
 
-    for (size_t i = 0; i < left->data.grid.rows * left->data.grid.columns; i++) {
+    if (left->data.grid.rows * left->data.grid.columns != right->data.grid.rows * right->data.grid.columns) {
+        return false;
+    }
+
+    if (left->data.grid.rows * left->data.grid.columns > MAX_GRID_CELLS) {
+        ESP_LOGE(TAG, "Grid cell count exceeds maximum supported cells. Cannot compare grid equality.");
+        return false;
+    }
+
+    for (size_t i = 0; i < left->data.grid.rows * left->data.grid.columns && i < MAX_GRID_CELLS; i++) {
         bool areCellsSame = left->data.grid.cells[i].isActive == right->data.grid.cells[i].isActive 
                             && strcmp(left->data.grid.cells[i].text, right->data.grid.cells[i].text) == 0
                             && left->data.grid.cells[i].columnSpan == right->data.grid.cells[i].columnSpan;
@@ -400,16 +409,15 @@ static void paintSceneItem(const PixelRenderItem *item, const PixelRegion *pixel
                     item->data.icon.iconId), item->data.icon.position, displayPipeline->getColor(DISPLAY_COLOR_BLACK)
                 );
             break;
-        case RENDER_ITEM_TYPE_GRID:
-            paintBoxGrid((BoxGridData){
-                .position = item->data.grid.position,
-                .size = item->data.grid.size,
-                .colorAccent = displayPipeline->getColor(DISPLAY_COLOR_BLACK),
-                .colorDefault = displayPipeline->getColor(DISPLAY_COLOR_WHITE),
-                .rows = item->data.grid.rows,
-                .columns = item->data.grid.columns,
-            });
+        case RENDER_ITEM_TYPE_GRID: {
+            BoxGridData gridData = item->data.grid;
+
+            gridData.colorAccent = displayPipeline->getColor((DisplayColor)item->data.grid.colorAccent);
+            gridData.colorDefault = displayPipeline->getColor((DisplayColor)item->data.grid.colorDefault);
+
+            paintBoxGrid(gridData);
             break;
+        }
         default:
             ESP_LOGW(TAG, "Unknown render item type: %d", item->type);
     }

@@ -3,9 +3,9 @@
 #include "GUI_Paint.h"
 
 #include "screen/screen_layout.h"
-#include "display_custom_paint.h"
+#include "display/display_custom_paint.h"
+#include "display/display_types.h"
 #include "generated_icons.h"
-#include "display_types.h"
 
 typedef struct {
     uint16_t mainColor;

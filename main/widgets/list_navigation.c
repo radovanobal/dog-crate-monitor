@@ -408,7 +408,7 @@ static void buildUpIndicatorScene(DisplayRenderPlan *displayRenderPlan) {
         .count = 0
     };
 
-    const char upIndicatorText[32] = "▲";
+    const char upIndicatorText[64] = "▲";
 
     struct PixelCoordinates2D upTextPosition = calculateAlignedTextPosition(
         &navigationRegions[DISPLAY_REGION_SLOT_INDICATOR_UP], 
@@ -442,7 +442,7 @@ static void buildDownIndicatorScene(DisplayRenderPlan *displayRenderPlan) {
         .count = 0
     };
 
-    const char downIndicatorText[32] = "▼";
+    const char downIndicatorText[64] = "▼";
 
     struct PixelCoordinates2D downTextPosition = calculateAlignedTextPosition(
         &navigationRegions[DISPLAY_REGION_SLOT_INDICATOR_DOWN], 

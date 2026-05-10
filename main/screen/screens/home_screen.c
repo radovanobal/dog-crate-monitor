@@ -24,10 +24,10 @@ typedef struct {
         int batteryLevel;
     } data;
     struct {
-        char clockText[16];
-        char temperatureText[16];
-        char humidityText[16];
-        char batteryLevelText[16];
+        char clockText[64];
+        char temperatureText[64];
+        char humidityText[64];
+        char batteryLevelText[64];
     } derived;
 } HomeScreenState;
 

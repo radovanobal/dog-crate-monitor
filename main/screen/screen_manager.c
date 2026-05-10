@@ -15,7 +15,7 @@ static void handleInputEvent(const AppEvent *event, const AppState *state, Scree
 static ScreenRegistration createScreenRegistration(ScreenId id, const ScreenInterface *interface);
 static void ensureActiveScreenRegistered(const AppState *state);
 static bool isNonReturnablePurpose(ScreenPurpose purpose);
-DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType);
+static DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType);
 
 static const char *TAG = "screen_manager";
 
@@ -68,7 +68,7 @@ ScreenActionResult screenManager_handleEvent(const AppEvent *event, const AppSta
     return screenResult;
 }
 
-DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType) {
+static DisplayPrepareRequest evaluateDisplay(const AppState *appState, DisplayRenderPlan *renderPlan, DisplayPipelineType *pipelineType) {
     ensureActiveScreenRegistered(appState);
 
     return registeredScreen.interface->evaluateDisplay(appState, renderPlan, pipelineType);

@@ -5,7 +5,7 @@
 #include "screen_render.h"
 #include "generated_icons.h"
 
-PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font) {
+PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const char text[64], sFONT *font) {
     PixelRenderItem renderItem = (PixelRenderItem){
         .type = RENDER_ITEM_TYPE_TEXT,
         .data = {
@@ -21,7 +21,7 @@ PixelRenderItem createTextRenderItem(struct PixelCoordinates2D position, const c
     return renderItem;
 }
 
-PixelRenderItem createTextUnderlineRenderItem(struct PixelCoordinates2D position, const char text[16], sFONT *font, DOT_PIXEL thickness) {
+PixelRenderItem createTextUnderlineRenderItem(struct PixelCoordinates2D position, const char text[64], sFONT *font, DOT_PIXEL thickness) {
     PixelRenderItem renderItem = (PixelRenderItem) {
         .type = RENDER_ITEM_TYPE_LINE,
         .data = {

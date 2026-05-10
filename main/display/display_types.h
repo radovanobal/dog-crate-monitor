@@ -9,7 +9,7 @@
 
 #define MAX_RENDER_ITEMS_PER_REGION 4
 #define MAX_RENDER_SCENES 8
-#define MAX_GRID_CELLS 40
+#define MAX_GRID_CELLS 70
 
 struct GridConfig {
     int width;
@@ -104,8 +104,8 @@ typedef struct {
     struct PixelCoordinates2D position;
     struct PixelSize2D size;
     BoxGridCellData cells[MAX_GRID_CELLS];
-    uint8_t colorAccent;
-    uint8_t colorDefault;
+    uint16_t colorAccent;
+    uint16_t colorDefault;
     uint8_t rows;
     uint8_t columns;
 } BoxGridData;
@@ -115,7 +115,7 @@ typedef struct {
     union {
         struct {
             struct PixelCoordinates2D position;
-            char text[32];
+            char text[64];
             sFONT *font;
         } text;
         struct {
